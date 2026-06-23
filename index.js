@@ -43,12 +43,43 @@ async function autoCloseTickets(bot) {
 
   require("./bot")(bot);
 
+  // ===== Drop pending updates & handle conflict =====
   try {
-    await bot.launch();
+    // Hapus webhook jika ada (mencegah konflik polling vs webhook)
+    await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+    console.log("• Webhook cleared, pending updates dropped");
   } catch (err) {
-    console.error("❌ Gagal menjalankan bot:", err.message);
-    console.error("Pastikan botToken di config.js valid!");
-    process.exit(1);
+    console.warn("⚠️  Gagal clear webhook:", err.message);
+  }
+
+  // Tunggu sebentar supaya session lama expired
+  await new Promise(r => setTimeout(r, 2000));
+
+  try {
+    await bot.launch({ dropPendingUpdates: true });
+  } catch (err) {
+    if (err.message && err.message.includes("409")) {
+      console.error("❌ Error 409: Ada instance bot lain yang masih berjalan!");
+      console.error("   Solusi:");
+      console.error("   1. Matikan semua proses bot yang lain (kill process)");
+      console.error("   2. Pastikan hanya 1 instance bot yang running");
+      console.error("   3. Cek apakah token ini dipakai di bot/server lain");
+      console.error("");
+      console.error("   Retrying dalam 10 detik...");
+      await new Promise(r => setTimeout(r, 10000));
+      try {
+        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        await bot.launch({ dropPendingUpdates: true });
+      } catch (err2) {
+        console.error("❌ Retry gagal:", err2.message);
+        console.error("   STOP semua instance bot lain lalu jalankan ulang!");
+        process.exit(1);
+      }
+    } else {
+      console.error("❌ Gagal menjalankan bot:", err.message);
+      console.error("   Pastikan botToken di config.js valid!");
+      process.exit(1);
+    }
   }
 
   await bot.telegram.setMyCommands([
