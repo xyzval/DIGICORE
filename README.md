@@ -24,6 +24,20 @@ Telegram bot otomatis untuk penjualan VPS dan RDP dengan pembayaran QRIS instan.
 
 ## Instalasi
 
+### Quick Install (1 Klik)
+
+Copy & paste command ini di terminal VPS Anda:
+
+```bash
+git clone https://github.com/xyzval/DIGICORE.git && cd DIGICORE && npm install && npm install telegraf axios archiver qrcode node-fetch && pm2 start index.js --name digicore && pm2 save && pm2 startup
+```
+
+> Bot langsung hidup 24 jam & auto restart jika VPS reboot.
+
+---
+
+### Manual Install (Step by Step)
+
 ### 1. Clone Repository
 
 ```bash
