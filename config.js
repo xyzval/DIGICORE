@@ -1,5 +1,5 @@
 module.exports = {
-  botToken: "8966186137:AAHHGwe2VmVEPJZeF5pkdB05nFRFwQjhfs8",
+  botToken: "8966186137:AAFCRWAu4h0mQch8FJ1xr9dC4whc1dw5x0s",
   prefix: "/",
   ownerName: "DIGICORE",
   ownerUsername: "",
