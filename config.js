@@ -1,9 +1,8 @@
 module.exports = {
   botToken: "8966186137:AAHHGwe2VmVEPJZeF5pkdB05nFRFwQjhfs8",
-  menuImage: "https://files.catbox.moe/svl8hj.jpg",
   prefix: "/",
   ownerName: "DIGICORE",
-  ownerUsername: "fitzmeee",
+  ownerUsername: "",
   ownerId: "7903948335",
   channelLink: "",
 

@@ -210,7 +210,7 @@ module.exports = (bot) => {
         if (fromId) addUser({ id: fromId, username: userName, first_name: ctx.from.first_name, last_name: ctx.from.last_name || "", join_date: new Date().toISOString(), total_spent: 0, history: [] });
 
         // Blacklist check
-        if (isBlacklisted(fromId) && isCmd) return ctx.reply("🚫 Anda telah di-blacklist dan tidak dapat menggunakan bot ini.\nHubungi admin jika ada pertanyaan.");
+        if (isBlacklisted(fromId) && isCmd) return ctx.reply("🚫 Anda telah di-blacklist dan tidak dapat menggunakan bot ini.");
 
         // Maintenance check
         if (config.maintenance && !isOwner(ctx) && isCmd) {
