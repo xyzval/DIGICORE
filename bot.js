@@ -261,7 +261,7 @@ module.exports = (bot) => {
 
         switch (command) {
             case "menu": case "start": {
-                return ctx.replyWithPhoto(config.menuImage, { caption: menuTextBot(ctx), parse_mode: "HTML", reply_markup: mainKeyboard(ctx) });
+                return ctx.reply(menuTextBot(ctx), { parse_mode: "HTML", reply_markup: mainKeyboard(ctx) });
             }
 
             case "profile": {
