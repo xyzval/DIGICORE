@@ -582,7 +582,19 @@ module.exports = (bot) => {
         return ctx.reply("💻 *Pilih Kategori VPS/RDP:*", { parse_mode: "Markdown", reply_markup: { inline_keyboard: btns } });
     });
 
-    bot.action("show_review", async (ctx) => { try { await ctx.answerCbQuery(); } catch {} ctx.reply("/review"); });
+    bot.action("show_review", async (ctx) => {
+        try { await ctx.answerCbQuery(); } catch {}
+        const reviews = loadReviews();
+        if (reviews.length === 0) return ctx.reply("📭 Belum ada review.");
+        const avg = (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1);
+        let rText = `<b>📝 Review Pelanggan</b>\n\n${"⭐".repeat(Math.round(avg))} <b>${avg}/5</b> (${reviews.length} review)\n━━━━━━━━━━━━━━━━\n\n`;
+        [...reviews].reverse().slice(0, 10).forEach(r => {
+            rText += `${"⭐".repeat(r.rating)} <b>(${r.rating}/5)</b>\n👤 ${escapeHtml(r.username || "Anonim")}\n📦 ${escapeHtml(r.product)}\n`;
+            if (r.comment) rText += `💬 "${escapeHtml(r.comment)}"\n`;
+            rText += `📅 ${new Date(r.timestamp).toLocaleDateString('id-ID')}\n\n`;
+        });
+        return ctx.reply(rText, { parse_mode: "HTML" });
+    });
     bot.action("show_ticket", async (ctx) => { try { await ctx.answerCbQuery(); } catch {} ctx.reply(`Buat tiket: <code>${config.prefix}ticket [pesan]</code>\nCek tiket: <code>${config.prefix}cektiket</code>`, { parse_mode: "HTML" }); });
     bot.action("owner_menu", async (ctx) => { try { await ctx.answerCbQuery(); } catch {} return ctx.reply(menuTextOwn(), { parse_mode: "HTML" }); });
     bot.action("snk_menu", async (ctx) => { try { await ctx.answerCbQuery(); } catch {} return ctx.reply(snkText, { parse_mode: "HTML" }); });
@@ -623,12 +635,26 @@ module.exports = (bot) => {
         const price = item.price + fee;
         const name = `VPS ${category} (${item.description})`;
         const paymentType = config.paymentGateway;
-        const pay = await createPayment(paymentType, price, config, { customerName: `@${ctx.from.username || ctx.from.first_name}` });
+
+        let pay;
+        try {
+            pay = await createPayment(paymentType, price, config, { customerName: `@${ctx.from.username || ctx.from.first_name}` });
+        } catch (err) {
+            console.error("[CREATE PAYMENT ERROR]", err.message);
+            return ctx.reply(`❌ Gagal membuat pembayaran: ${err.message}`);
+        }
 
         orders[userId] = { type: "vps_stock", category, itemIndex: index, name, description: item.description, amount: price, fee, orderId: pay.orderId || null, transactionId: pay.transactionId || null, paymentType, chatId: ctx.chat.id, expireAt: Date.now() + 6 * 60 * 1000 };
 
-        const photo = paymentType === "pakasir" ? { source: pay.qris } : pay.qris;
-        const qrMsg = await ctx.replyWithPhoto(photo, { caption: `📦 Produk: ${name}\n💰 Harga: Rp${toRupiah(price)} (Fee Rp${fee})\n⏳ Expired QRIS: 6 Menit\n\nScan QRIS untuk pembayaran.`, parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: "cancel_order" }]] } });
+        let qrMsg;
+        try {
+            const photo = paymentType === "pakasir" ? { source: pay.qris } : pay.qris;
+            qrMsg = await ctx.replyWithPhoto(photo, { caption: `📦 Produk: ${name}\n💰 Harga: Rp${toRupiah(price)} (Fee Rp${fee})\n⏳ Expired QRIS: 6 Menit\n\nScan QRIS untuk pembayaran.`, parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: "cancel_order" }]] } });
+        } catch (err) {
+            console.error("[SEND QR ERROR]", err.message);
+            delete orders[userId];
+            return ctx.reply(`❌ Gagal mengirim QRIS: ${err.message}`);
+        }
         orders[userId].qrMessageId = qrMsg.message_id;
         startCheck(userId, ctx);
     });

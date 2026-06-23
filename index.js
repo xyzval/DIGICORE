@@ -43,7 +43,14 @@ async function autoCloseTickets(bot) {
 
   require("./bot")(bot);
 
-  bot.launch();
+  try {
+    await bot.launch();
+  } catch (err) {
+    console.error("❌ Gagal menjalankan bot:", err.message);
+    console.error("Pastikan botToken di config.js valid!");
+    process.exit(1);
+  }
+
   await bot.telegram.setMyCommands([
     { command: "menu", description: "Tampilkan Menu Utama" },
     { command: "buyvps", description: "Beli VPS / RDP" },

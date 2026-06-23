@@ -6,6 +6,13 @@ module.exports = {
   ownerId: "7903948335",
   channelLink: "",
 
+  // ===== Panel Pterodactyl (untuk createPanel/createAdmin) =====
+  domain: "",
+  apikey: "",
+  nestid: "1",
+  egg: "1",
+  loc: "1",
+
   // 👉 Pilih: "orderkuota", "pakasir", atau "violet"
   paymentGateway: "violet",
 
