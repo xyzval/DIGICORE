@@ -29,7 +29,7 @@ async function autoCloseTickets(bot) {
         changed = true;
         try {
           await bot.telegram.sendMessage(ticket.userId,
-            `🔴 <b>Tiket #${ticket.id} Ditutup Otomatis</b>\n\nTidak ada aktivitas selama 48 jam.\nBuat tiket baru jika masih ada masalah:\n<code>${config.prefix}ticket [pesan]</code>`,
+            `🔴 <b>Tiket #${ticket.id} Ditutup Otomatis</b>\n\nTidak ada aktivitas selama 48 jam.\nBuat tiket baru jika masih ada masalah:\n<code>${config.prefix}support [pesan]</code>`,
             { parse_mode: "HTML" });
         } catch (e) {}
       }
@@ -42,45 +42,6 @@ async function autoCloseTickets(bot) {
   const bot = new Telegraf(config.botToken);
 
   require("./bot")(bot);
-
-  // ===== Drop pending updates & handle conflict =====
-  try {
-    // Hapus webhook jika ada (mencegah konflik polling vs webhook)
-    await bot.telegram.deleteWebhook({ drop_pending_updates: true });
-    console.log("• Webhook cleared, pending updates dropped");
-  } catch (err) {
-    console.warn("⚠️  Gagal clear webhook:", err.message);
-  }
-
-  // Tunggu sebentar supaya session lama expired
-  await new Promise(r => setTimeout(r, 2000));
-
-  try {
-    await bot.launch({ dropPendingUpdates: true });
-  } catch (err) {
-    if (err.message && err.message.includes("409")) {
-      console.error("❌ Error 409: Ada instance bot lain yang masih berjalan!");
-      console.error("   Solusi:");
-      console.error("   1. Matikan semua proses bot yang lain (kill process)");
-      console.error("   2. Pastikan hanya 1 instance bot yang running");
-      console.error("   3. Cek apakah token ini dipakai di bot/server lain");
-      console.error("");
-      console.error("   Retrying dalam 10 detik...");
-      await new Promise(r => setTimeout(r, 10000));
-      try {
-        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
-        await bot.launch({ dropPendingUpdates: true });
-      } catch (err2) {
-        console.error("❌ Retry gagal:", err2.message);
-        console.error("   STOP semua instance bot lain lalu jalankan ulang!");
-        process.exit(1);
-      }
-    } else {
-      console.error("❌ Gagal menjalankan bot:", err.message);
-      console.error("   Pastikan botToken di config.js valid!");
-      process.exit(1);
-    }
-  }
 
   // ===== Force update bot commands =====
   try {
@@ -95,6 +56,18 @@ async function autoCloseTickets(bot) {
   } catch (err) {
     console.warn("⚠️  Gagal update commands:", err.message);
   }
+
+  // ===== Launch bot =====
+  bot.launch({ dropPendingUpdates: true })
+    .catch((err) => {
+      console.error("❌ Bot launch error:", err.message);
+      if (err.message && err.message.includes("409")) {
+        console.error("   Ada instance bot lain yang masih jalan!");
+        console.error("   Jalankan: pkill -f 'node index.js' lalu coba lagi");
+      }
+      process.exit(1);
+    });
+
   console.log("• DIGICORE Bot Connected");
 
   startAutoBackup(bot);
