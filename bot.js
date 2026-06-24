@@ -1022,14 +1022,18 @@ module.exports = (bot) => {
 
                     // Loading animasi
                     const steps = [
-                        { bar: '░░░░░░░░░░', pct: 0, status: 'Memulai provisioning...' },
-                        { bar: '██░░░░░░░░', pct: 20, status: 'Mengalokasikan resource...' },
-                        { bar: '████░░░░░░', pct: 40, status: 'Menginstal OS...' },
-                        { bar: '██████░░░░', pct: 60, status: 'Mengkonfigurasi jaringan...' },
-                        { bar: '████████░░', pct: 80, status: 'Menyiapkan akses...' },
-                        { bar: '██████████', pct: 100, status: 'Selesai! ✅' },
+                        { pct: 0, status: '🔄 Inisialisasi server...' },
+                        { pct: 20, status: '🖥️ Mengalokasikan resource...' },
+                        { pct: 40, status: '💿 Menginstal sistem operasi...' },
+                        { pct: 60, status: '🌐 Mengkonfigurasi jaringan...' },
+                        { pct: 80, status: '🔐 Menyiapkan kredensial...' },
+                        { pct: 100, status: '✅ Server siap digunakan!' },
                     ];
-                    const buildText = (s) => `🔄 Memproses VPS...\n\n💻 ${o.name}\n\n${s.bar} ${s.pct}%\n⏳ ${s.status}`;
+                    const buildBar = (pct) => {
+                        const filled = Math.round(pct / 10);
+                        return '▓'.repeat(filled) + '░'.repeat(10 - filled);
+                    };
+                    const buildText = (s) => `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐏𝐫𝐨𝐯𝐢𝐬𝐢𝐨𝐧𝐢𝐧𝐠\n━━━━━━━━━━━━━━━━━━━━\n\n💻 ${o.name}\n\n${buildBar(s.pct)}  ${s.pct}%\n\n${s.status}\n\n━━━━━━━━━━━━━━━━━━━━\n⏳ Mohon tunggu sebentar...`;
                     let loadMsgId = null;
                     try { const lm = await ctx.telegram.sendMessage(o.chatId, buildText(steps[0])); loadMsgId = lm.message_id; } catch {}
                     for (let i = 1; i < steps.length; i++) {
