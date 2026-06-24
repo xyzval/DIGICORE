@@ -91,13 +91,10 @@ const menuTextBot = (ctx) => {
 Halo, @${ctx.from.username || "—"}
 
 📊 Dashboard
-<pre>
-╔═══════════════════╗
-║ 📦 ${String(getTotalOrderUsers()).padEnd(4)} Orders    ║
-║ ⭐ ${avgRating.padEnd(4)} Rating    ║
-║ 💻 ${String(totalVpsStock).padEnd(4)} VPS Ready ║
-╚═══════════════════╝
-</pre>
+
+📦 ${getTotalOrderUsers()} Orders
+⭐ ${avgRating} Rating
+💻 ${totalVpsStock} VPS Ready
 
 🏷️ Layanan:
 • VPS Dedicated (Linux/Windows)
