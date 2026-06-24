@@ -122,6 +122,7 @@ const menuTextOwn = () => `<blockquote>( ⸙‌ ) 𝐃𝐈𝐆𝐈𝐂𝐎𝐑�
 ▢ ${config.prefix}broadcast
 ▢ ${config.prefix}maintenance
 ▢ ${config.prefix}editgaransi
+▢ ${config.prefix}garansiconfig
 ▢ ${config.prefix}addstockvps
 ▢ ${config.prefix}delstockvps
 ▢ ${config.prefix}getstockvps
@@ -371,6 +372,43 @@ module.exports = (bot) => {
                 }
                 saveGaransiText(text);
                 return ctx.reply(`✅ <b>Sistem Garansi berhasil diubah!</b>\n\n━━━━━━━━━━━━━━━━━━━━\n${text}`, { parse_mode: "HTML" });
+            }
+
+            // ===== GARANSI CONFIG (OWNER) =====
+            case "garansiconfig": {
+                if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
+                if (!text) {
+                    return ctx.reply(`🛡️ <b>Garansi Config</b>\n\n` +
+                        `⟢ Markup Harga   : Rp${toRupiah(config.garansiMarkup || 10000)}\n` +
+                        `⟢ Garansi Premium : ${config.garansiDays || 30} Hari\n` +
+                        `⟢ Garansi Dasar   : ${config.garansiBaseDays || 12} Hari\n\n` +
+                        `━━━━━━━━━━━━━━━━━━━━\n<b>Cara edit:</b>\n` +
+                        `<code>${config.prefix}garansiconfig markup [angka]</code>\n` +
+                        `<code>${config.prefix}garansiconfig premium [hari]</code>\n` +
+                        `<code>${config.prefix}garansiconfig dasar [hari]</code>\n\n` +
+                        `<b>Contoh:</b>\n` +
+                        `<code>${config.prefix}garansiconfig markup 15000</code>\n` +
+                        `<code>${config.prefix}garansiconfig premium 30</code>\n` +
+                        `<code>${config.prefix}garansiconfig dasar 12</code>`,
+                        { parse_mode: "HTML" });
+                }
+                const gcArgs = text.split(" ");
+                const gcType = gcArgs[0].toLowerCase();
+                const gcValue = parseInt(gcArgs[1]);
+                if (isNaN(gcValue) || gcValue <= 0) return ctx.reply("❌ Masukkan angka yang valid!");
+
+                if (gcType === "markup") {
+                    config.garansiMarkup = gcValue;
+                    return ctx.reply(`✅ Markup garansi diubah menjadi <b>Rp${toRupiah(gcValue)}</b>`, { parse_mode: "HTML" });
+                } else if (gcType === "premium") {
+                    config.garansiDays = gcValue;
+                    return ctx.reply(`✅ Garansi premium diubah menjadi <b>${gcValue} Hari</b>`, { parse_mode: "HTML" });
+                } else if (gcType === "dasar") {
+                    config.garansiBaseDays = gcValue;
+                    return ctx.reply(`✅ Garansi dasar diubah menjadi <b>${gcValue} Hari</b>`, { parse_mode: "HTML" });
+                } else {
+                    return ctx.reply(`❌ Pilihan tidak valid!\n\nGunakan: <code>markup</code>, <code>premium</code>, atau <code>dasar</code>`, { parse_mode: "HTML" });
+                }
             }
 
 
