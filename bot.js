@@ -314,7 +314,7 @@ module.exports = (bot) => {
 
 
             // ===== BUY VPS =====
-            case "buyvps": {
+            case "buycloud": case "buyvps": {
                 const vpsData = loadVps();
                 const categories = Object.keys(vpsData);
                 if (categories.length === 0) return ctx.reply("Stok VPS/RDP sedang kosong.");

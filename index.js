@@ -48,7 +48,7 @@ async function autoCloseTickets(bot) {
     await bot.telegram.deleteMyCommands();
     await bot.telegram.setMyCommands([
       { command: "menu", description: "Tampilkan Menu Utama" },
-      { command: "buyvps", description: "Beli VPS / RDP" },
+      { command: "buycloud", description: "Beli VPS / RDP" },
       { command: "support", description: "Buat Tiket Support" },
       { command: "claimgaransi", description: "Claim Garansi VPS" }
     ]);
