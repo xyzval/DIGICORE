@@ -92,7 +92,7 @@ pm2 start index.js --name digicore
 | Command | Fungsi |
 |---------|--------|
 | `/menu` atau `/start` | Tampilkan menu utama |
-| `/buyvps` | Beli VPS / RDP |
+| `/buycloud` | Beli VPS / RDP |
 | `/profile` | Lihat profil & total spent |
 | `/history` | Riwayat transaksi |
 | `/review` | Lihat review pelanggan |

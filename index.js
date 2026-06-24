@@ -46,7 +46,7 @@ async function autoCloseTickets(bot) {
   bot.launch();
   await bot.telegram.setMyCommands([
     { command: "menu", description: "Tampilkan Menu Utama" },
-    { command: "buyvps", description: "Beli VPS / RDP" },
+    { command: "buycloud", description: "Beli VPS / RDP" },
     { command: "ticket", description: "Buat Tiket Support" }
   ]);
   console.log("• DIGICORE Bot Connected");
