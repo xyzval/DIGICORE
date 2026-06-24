@@ -47,8 +47,9 @@ module.exports = {
   },
 
   // ===== Garansi =====
-  garansiMarkup: 10000,  // Tambahan harga garansi otomatis (Rp)
-  garansiDays: 7,        // Masa garansi (hari)
+  garansiMarkup: 10000,  // Tambahan harga garansi premium (Rp)
+  garansiDays: 30,       // Masa garansi premium (hari)
+  garansiBaseDays: 12,   // Masa garansi dasar/tanpa tambahan (hari)
 
   // ===== Maintenance Mode =====
   maintenance: false

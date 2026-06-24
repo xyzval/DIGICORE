@@ -502,17 +502,16 @@ module.exports = (bot) => {
                 const user = users.find(u => u.id === fromId);
                 if (!user || !user.history || user.history.length === 0) return ctx.reply("❌ Anda belum pernah order. Tidak ada garansi aktif.");
 
-                // Cek apakah ada pembelian yang masih dalam masa garansi (7 hari default)
+                // Cek apakah ada pembelian yang masih dalam masa garansi
                 const now = Date.now();
-                const GARANSI_DAYS = config.garansiDays || 7;
                 const activeOrders = user.history.filter(h => {
-                    if (h.hasGaransi === false) return false; // Tanpa garansi tidak bisa claim
+                    const garansiDays = h.garansiDays || (h.hasGaransi ? (config.garansiDays || 30) : (config.garansiBaseDays || 12));
                     const orderTime = new Date(h.timestamp).getTime();
-                    const expiry = orderTime + (GARANSI_DAYS * 24 * 60 * 60 * 1000);
+                    const expiry = orderTime + (garansiDays * 24 * 60 * 60 * 1000);
                     return now <= expiry;
                 });
 
-                if (activeOrders.length === 0) return ctx.reply("❌ Tidak ada garansi aktif.\n\nKemungkinan:\n- Anda membeli paket Tanpa Garansi\n- Masa garansi sudah habis (7 hari)");
+                if (activeOrders.length === 0) return ctx.reply("❌ Tidak ada garansi aktif.\n\nMasa garansi sudah habis.");
 
                 // Cek apakah sudah pernah claim untuk order terakhir
                 const claims = loadClaims();
@@ -914,8 +913,8 @@ module.exports = (bot) => {
         const priceNoGaransi = item.priceNoGaransi || item.price;
 
         const btns = [
-            [{ text: `🛡️ Garansi ${config.garansiDays || 7} Hari • Rp${toRupiah(priceGaransi)}`, callback_data: `vps_pay|${category}|${index}|garansi` }],
-            [{ text: `⚡ Tanpa Garansi • Rp${toRupiah(priceNoGaransi)}`, callback_data: `vps_pay|${category}|${index}|nogaransi` }],
+            [{ text: `🛡️ Garansi ${config.garansiDays || 30} Hari • Rp${toRupiah(priceGaransi)}`, callback_data: `vps_pay|${category}|${index}|garansi` }],
+            [{ text: `⚡ Garansi ${config.garansiBaseDays || 12} Hari • Rp${toRupiah(priceNoGaransi)}`, callback_data: `vps_pay|${category}|${index}|nogaransi` }],
             [{ text: "↩️ Kembali", callback_data: `vps_category_buy|${category}` }]
         ];
 
@@ -940,7 +939,8 @@ module.exports = (bot) => {
         const fee = generateRandomFee();
         const price = basePrice + fee;
         const name = `VPS ${category} (${item.description})`;
-        const paketLabel = hasGaransi ? `🛡️ Garansi ${config.garansiDays || 7} Hari` : "⚡ Tanpa Garansi";
+        const garansiDaysUsed = hasGaransi ? (config.garansiDays || 30) : (config.garansiBaseDays || 12);
+        const paketLabel = hasGaransi ? `🛡️ Garansi ${garansiDaysUsed} Hari` : `⚡ Garansi ${garansiDaysUsed} Hari`;
         const paymentType = config.paymentGateway;
 
         let pay;
@@ -951,7 +951,7 @@ module.exports = (bot) => {
             return ctx.reply(`❌ Gagal membuat pembayaran: ${err.message}`);
         }
 
-        orders[userId] = { type: "vps_stock", category, itemIndex: index, name, description: item.description, amount: price, fee, orderId: pay.orderId || null, transactionId: pay.transactionId || null, paymentType, chatId: ctx.chat.id, expireAt: Date.now() + 6 * 60 * 1000, hasGaransi, paketLabel };
+        orders[userId] = { type: "vps_stock", category, itemIndex: index, name, description: item.description, amount: price, fee, orderId: pay.orderId || null, transactionId: pay.transactionId || null, paymentType, chatId: ctx.chat.id, expireAt: Date.now() + 6 * 60 * 1000, hasGaransi, garansiDays: garansiDaysUsed, paketLabel };
 
         let qrMsg;
         try {
@@ -1055,7 +1055,7 @@ module.exports = (bot) => {
             if (!o) return;
 
             // Update history
-            updateUserHistory(userId, { product: o.name, amount: o.amount, type: o.type, hasGaransi: o.hasGaransi || false });
+            updateUserHistory(userId, { product: o.name, amount: o.amount, type: o.type, hasGaransi: o.hasGaransi || false, garansiDays: o.garansiDays || (config.garansiBaseDays || 12) });
             const users = loadUsers();
             const uIdx = users.findIndex(u => u.id === userId);
             if (uIdx !== -1) { users[uIdx].total_spent = (users[uIdx].total_spent || 0) + o.amount; saveUsers(users); }
@@ -1114,9 +1114,8 @@ module.exports = (bot) => {
                     const getVal = (label) => { const line = String(sentVps).split("\n").find(v => v.toLowerCase().startsWith(label.toLowerCase() + ":")); return line ? line.split(":").slice(1).join(":").trim() : "-"; };
                     const ip = getVal("IP"); const port = getVal("PORT"); const user = getVal("USER"); const password = getVal("PASSWORD");
 
-                    const garansiInfo = o.hasGaransi
-                        ? `\n🛡️ Paket     : Garansi ${config.garansiDays || 7} Hari\n\n━━━ 𝐈𝐧𝐟𝐨𝐫𝐦𝐚𝐬𝐢 ━━━\n\n📅 Tanggal    : ${new Date().toLocaleDateString("id-ID")}\n🛡️ Garansi    : ${config.garansiDays || 7} Hari\n⚠️ Claim      : /claimgaransi`
-                        : `\n⚡ Paket     : Tanpa Garansi\n\n━━━ 𝐈𝐧𝐟𝐨𝐫𝐦𝐚𝐬𝐢 ━━━\n\n📅 Tanggal    : ${new Date().toLocaleDateString("id-ID")}\n⚡ Garansi    : Tidak ada`;
+                    const garansiDaysOrder = o.garansiDays || (o.hasGaransi ? (config.garansiDays || 30) : (config.garansiBaseDays || 12));
+                    const garansiInfo = `\n🛡️ Paket     : Garansi ${garansiDaysOrder} Hari\n\n━━━ 𝐈𝐧𝐟𝐨𝐫𝐦𝐚𝐬𝐢 ━━━\n\n📅 Tanggal    : ${new Date().toLocaleDateString("id-ID")}\n🛡️ Garansi    : ${garansiDaysOrder} Hari\n⚠️ Claim      : /claimgaransi`;
 
                     const vpsText = `<blockquote>◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫 𝐂𝐨𝐧𝐟𝐢𝐫𝐦𝐞𝐝\n\n┏━━━━━━━━━━━━━━━━━━━┓\n┃  ✅ PEMBAYARAN SUKSES\n┗━━━━━━━━━━━━━━━━━━━┛\n\n⟢ Produk  : ${escapeHtml(o.name)}\n⟢ Harga   : Rp${toRupiah(o.amount)}${garansiInfo}\n\n━━━ 𝐀𝐤𝐬𝐞𝐬 𝐒𝐞𝐫𝐯𝐞𝐫 ━━━\n\n🌐 IP       : ${ip}\n🔌 Port     : ${port}\n👤 User     : ${user}\n🔑 Pass     : ${password}\n\nTerima kasih telah mempercayai DIGICORE 🙏</blockquote>`;
                     try { await ctx.telegram.sendMessage(o.chatId, vpsText, { parse_mode: "HTML" }); } catch (e) {
