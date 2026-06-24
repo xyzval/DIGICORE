@@ -777,7 +777,7 @@ module.exports = (bot) => {
             // ===== ADD STOCK VPS =====
             case "addstockvps": {
                 if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
-                if (!text.includes("|")) return ctx.reply(`Format:\n<code>${config.prefix}addstockvps kategori|keterangan|IP|PORT|USER|PASSWORD|harga</code>\n\nContoh 1 harga (markup otomatis +Rp${toRupiah(config.garansiMarkup || 10000)}):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|1.2.3.4|22022|root|abc123|25000</code>\n\nContoh 2 harga (manual):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|1.2.3.4|22022|root|abc123|35000|25000</code>`, { parse_mode: "HTML" });
+                if (!text.includes("|")) return ctx.reply(`Format:\n<code>${config.prefix}addstockvps kategori|keterangan|IP|PORT|USER|PASSWORD|harga</code>\n\nContoh 1 harga (harga premium, dasar otomatis -Rp${toRupiah(config.garansiMarkup || 10000)}):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|1.2.3.4|22022|root|abc123|35000</code>\n\nContoh 2 harga (manual):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|1.2.3.4|22022|root|abc123|35000|25000</code>`, { parse_mode: "HTML" });
                 const parts = text.split("|").map(v => v.trim());
                 if (parts.length < 7) return ctx.reply("Format tidak valid! Minimal: kategori|keterangan|IP|PORT|USER|PASSWORD|harga");
                 const category = parts[0];
@@ -795,9 +795,10 @@ module.exports = (bot) => {
                     priceGaransi = parseInt(parts[6]);
                     priceNoGaransi = parseInt(parts[7]);
                 } else {
-                    // 1 harga → auto markup
-                    priceNoGaransi = parseInt(parts[6]);
-                    priceGaransi = priceNoGaransi + (config.garansiMarkup || 10000);
+                    // 1 harga = harga premium, dasar otomatis dikurangi markup
+                    priceGaransi = parseInt(parts[6]);
+                    priceNoGaransi = priceGaransi - (config.garansiMarkup || 10000);
+                    if (priceNoGaransi < 0) priceNoGaransi = priceGaransi;
                 }
 
                 if (!category || !description || !ip || !port || !user || !password || isNaN(priceNoGaransi)) return ctx.reply("Data tidak valid!");
