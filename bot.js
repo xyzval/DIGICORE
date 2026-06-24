@@ -272,7 +272,7 @@ module.exports = (bot) => {
             case "history": {
                 const users = loadUsers();
                 const user = users.find(u => u.id === fromId);
-                if (!user || !user.history || user.history.length === 0) return ctx.reply("📭 Belum ada riwayat transaksi.");
+                if (!user || !user.history || user.history.length === 0) return ctx.reply("Belum ada riwayat transaksi.");
                 let hText = "📋 <b>Riwayat Transaksi</b>\n\n";
                 [...user.history].reverse().slice(0, 10).forEach((t, i) => {
                     hText += `<b>${i + 1}. ${escapeHtml(t.product)}</b>\n💰 Rp${toRupiah(t.amount)} | 📅 ${new Date(t.timestamp).toLocaleDateString('id-ID')}\n\n`;
@@ -282,7 +282,7 @@ module.exports = (bot) => {
 
             case "review": case "reviews": {
                 const reviews = loadReviews();
-                if (reviews.length === 0) return ctx.reply("📭 Belum ada review.");
+                if (reviews.length === 0) return ctx.reply("Belum ada review.");
                 const avg = (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1);
                 let rText = `<b>📝 Review Pelanggan</b>\n\n${"⭐".repeat(Math.round(avg))} <b>${avg}/5</b> (${reviews.length} review)\n━━━━━━━━━━━━━━━━\n\n`;
                 [...reviews].reverse().slice(0, 10).forEach(r => {
@@ -298,7 +298,7 @@ module.exports = (bot) => {
             case "buyvps": {
                 const vpsData = loadVps();
                 const categories = Object.keys(vpsData);
-                if (categories.length === 0) return ctx.reply("📭 Stok VPS/RDP sedang kosong.");
+                if (categories.length === 0) return ctx.reply("Stok VPS/RDP sedang kosong.");
                 const btns = categories.map(cat => [{ text: `💻 ${cat.charAt(0).toUpperCase() + cat.slice(1)}`, callback_data: `vps_category_buy|${cat}` }]);
                 return ctx.reply("💻 *Pilih Kategori VPS/RDP:*", { parse_mode: "Markdown", reply_markup: { inline_keyboard: btns } });
             }
@@ -345,7 +345,7 @@ module.exports = (bot) => {
             case "userlist": {
                 if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
                 const users = loadUsers();
-                if (users.length === 0) return ctx.reply("📭 Belum ada user.");
+                if (users.length === 0) return ctx.reply("Belum ada user.");
                 let uText = `<b>📊 Total Users: ${users.length}</b>\n\n`;
                 users.slice(0, 20).forEach((u, i) => { uText += `<b>${i + 1}. ${escapeHtml(u.first_name || "")}</b>\n<code>${u.id}</code> | @${escapeHtml(u.username || "-")} | Rp${toRupiah(u.total_spent || 0)}\n\n`; });
                 if (users.length > 20) uText += `<i>...dan ${users.length - 20} lainnya</i>`;
@@ -407,7 +407,7 @@ module.exports = (bot) => {
             case "cektiket": case "myticket": case "tiket": {
                 const tickets = loadTickets();
                 const myT = tickets.filter(t => t.userId === fromId);
-                if (myT.length === 0) return ctx.reply("📭 Belum ada tiket.");
+                if (myT.length === 0) return ctx.reply("Belum ada tiket.");
                 if (text) {
                     const t = myT.find(t2 => t2.id === text.replace("#", ""));
                     if (!t) return ctx.reply("❌ Tiket tidak ditemukan.");
@@ -486,7 +486,7 @@ module.exports = (bot) => {
                 if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
                 const vpsData = loadVps();
                 const cats = Object.keys(vpsData);
-                if (cats.length === 0) return ctx.reply("📭 Tidak ada stok VPS.");
+                if (cats.length === 0) return ctx.reply("Tidak ada stok VPS.");
                 const btns = cats.map(c => [{ text: `💻 ${c} (${vpsData[c].reduce((s, i) => s + i.accounts.length, 0)})`, callback_data: `delvps_cat|${c}` }]);
                 return ctx.reply("Pilih kategori untuk hapus:", { reply_markup: { inline_keyboard: btns } });
             }
@@ -496,7 +496,7 @@ module.exports = (bot) => {
                 if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
                 const vpsData = loadVps();
                 const cats = Object.keys(vpsData);
-                if (cats.length === 0) return ctx.reply("📭 Stok VPS kosong.");
+                if (cats.length === 0) return ctx.reply("Stok VPS kosong.");
                 let sText = `💻 <b>Stok VPS/RDP</b>\n\n`;
                 cats.forEach(c => {
                     const items = vpsData[c];
@@ -567,7 +567,7 @@ module.exports = (bot) => {
         try { await ctx.answerCbQuery(); } catch {}
         const vpsData = loadVps();
         const categories = Object.keys(vpsData);
-        if (categories.length === 0) return ctx.reply("📭 Stok VPS/RDP sedang kosong.");
+        if (categories.length === 0) return ctx.reply("Stok VPS/RDP sedang kosong.");
         const btns = categories.map(cat => [{ text: `💻 ${cat.charAt(0).toUpperCase() + cat.slice(1)}`, callback_data: `vps_category_buy|${cat}` }]);
         return ctx.reply("💻 *Pilih Kategori VPS/RDP:*", { parse_mode: "Markdown", reply_markup: { inline_keyboard: btns } });
     });
@@ -575,7 +575,7 @@ module.exports = (bot) => {
     bot.action("show_review", async (ctx) => {
         try { await ctx.answerCbQuery(); } catch {}
         const reviews = loadReviews();
-        if (reviews.length === 0) return ctx.reply("📭 Belum ada review.");
+        if (reviews.length === 0) return ctx.reply("Belum ada review.");
         const avg = (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1);
         let rText = `<b>📝 Review Pelanggan</b>\n\n${"⭐".repeat(Math.round(avg))} <b>${avg}/5</b> (${reviews.length} review)\n━━━━━━━━━━━━━━━━\n\n`;
         [...reviews].reverse().slice(0, 10).forEach(r => {
