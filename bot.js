@@ -105,7 +105,7 @@ Halo, @${ctx.from.username || "—"}
 ━━━━━━━━━━━━━━━━━━━━
 🛡️ Trusted • ⚡ Instan • 💎 Premium
 
-/${config.prefix === "/" ? "" : config.prefix}profile • /history • /review • /ticket`;
+/${config.prefix === "/" ? "" : config.prefix}profile • /history • /review • /support`;
 };
 
 const menuTextOwn = () => `<blockquote>( ⸙‌ ) 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐰𝐧𝐞𝐫 𝐌𝐞𝐧𝐮
@@ -204,7 +204,7 @@ module.exports = (bot) => {
 
         // Maintenance check
         if (config.maintenance && !isOwner(ctx) && isCmd) {
-            const allowedInMaint = ["menu", "start", "profile", "history", "ticket", "cektiket", "myticket", "tiket"];
+            const allowedInMaint = ["menu", "start", "profile", "history", "support", "ticket", "cektiket", "myticket", "tiket"];
             if (!allowedInMaint.includes(command)) return ctx.reply("🔧 Bot sedang dalam pemeliharaan.\nSilakan coba lagi nanti.");
         }
 
@@ -391,9 +391,9 @@ module.exports = (bot) => {
             }
 
 
-            // ===== TICKET =====
-            case "ticket": {
-                if (!text) return ctx.reply(`🎫 <b>Buat Tiket:</b>\n<code>${config.prefix}ticket [pesan keluhan]</code>\n\nContoh: <code>${config.prefix}ticket VPS saya tidak bisa diakses</code>`, { parse_mode: "HTML" });
+            // ===== SUPPORT/TICKET =====
+            case "support": case "ticket": {
+                if (!text) return ctx.reply(`🎫 <b>Buat Tiket Support:</b>\n<code>${config.prefix}support [pesan keluhan]</code>\n\nContoh: <code>${config.prefix}support VPS saya tidak bisa diakses</code>`, { parse_mode: "HTML" });
                 const tickets = loadTickets();
                 const ticketId = String(tickets.length + 1).padStart(3, "0");
                 tickets.push({ id: ticketId, userId: fromId, username: userName, first_name: ctx.from.first_name || "", message: text, status: "open", replies: [], created_at: new Date().toISOString(), last_activity: new Date().toISOString(), closed_at: null });
