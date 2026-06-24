@@ -212,7 +212,7 @@ module.exports = (bot) => {
 
         // Maintenance check
         if (config.maintenance && !isOwner(ctx) && isCmd) {
-            const allowedInMaint = ["menu", "start", "profile", "history", "support", "ticket", "cektiket", "myticket", "tiket", "claim", "cekclaim", "myclaim"];
+            const allowedInMaint = ["menu", "start", "profile", "history", "support", "ticket", "cektiket", "myticket", "tiket", "claimgaransi", "claim", "cekclaim", "myclaim"];
             if (!allowedInMaint.includes(command)) return ctx.reply("🔧 Bot sedang dalam pemeliharaan.\nSilakan coba lagi nanti.");
         }
 
@@ -471,8 +471,8 @@ module.exports = (bot) => {
 
 
             // ===== CLAIM GARANSI (USER) =====
-            case "claim": {
-                if (!text) return ctx.reply(`🛡️ <b>Claim Garansi:</b>\n<code>${config.prefix}claim [alasan]</code>\n\nContoh: <code>${config.prefix}claim VPS mati tidak bisa diakses</code>`, { parse_mode: "HTML" });
+            case "claimgaransi": case "claim": {
+                if (!text) return ctx.reply(`🛡️ <b>Claim Garansi:</b>\n<code>${config.prefix}claimgaransi [alasan]</code>\n\nContoh: <code>${config.prefix}claimgaransi VPS mati tidak bisa diakses</code>`, { parse_mode: "HTML" });
                 const users = loadUsers();
                 const user = users.find(u => u.id === fromId);
                 if (!user || !user.history || user.history.length === 0) return ctx.reply("❌ Anda belum pernah order. Tidak ada garansi aktif.");
