@@ -136,6 +136,7 @@ const menuTextOwn = () => `<blockquote>( ⸙‌ ) 𝐃𝐈𝐆𝐈𝐂𝐎𝐑�
 ▢ ${config.prefix}approve
 ▢ ${config.prefix}reject
 ▢ ${config.prefix}sendclaim
+▢ ${config.prefix}update
 </blockquote>`;
 
 const mainKeyboard = (ctx) => {
@@ -658,6 +659,56 @@ module.exports = (bot) => {
                 } catch (e) {}
 
                 return ctx.reply(`✅ Akun pengganti terkirim ke user untuk claim <b>#${claimId3}</b>`, { parse_mode: "HTML" });
+            }
+
+
+            // ===== UPDATE BOT (OWNER) =====
+            case "update": case "upgrade": {
+                if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
+                const statusMsg = await ctx.reply("🔄 <b>Updating bot...</b>\n\n⏳ Pulling latest code dari GitHub...", { parse_mode: "HTML" });
+
+                const { exec } = require("child_process");
+                const runCmd = (cmd) => new Promise((resolve) => {
+                    exec(cmd, { cwd: __dirname, timeout: 30000 }, (err, stdout, stderr) => {
+                        resolve({ error: err, stdout: stdout?.trim() || "", stderr: stderr?.trim() || "" });
+                    });
+                });
+
+                // Step 1: Git fetch & reset
+                const fetch = await runCmd("git fetch origin fix/bug-fixes-error-handling");
+                if (fetch.error) {
+                    return ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, `❌ <b>Update Gagal!</b>\n\n<code>${escapeHtml(fetch.stderr || fetch.error.message)}</code>`, { parse_mode: "HTML" });
+                }
+
+                const pull = await runCmd("git reset --hard origin/fix/bug-fixes-error-handling");
+                if (pull.error) {
+                    return ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, `❌ <b>Update Gagal!</b>\n\n<code>${escapeHtml(pull.stderr || pull.error.message)}</code>`, { parse_mode: "HTML" });
+                }
+
+                // Step 2: Install dependencies jika ada perubahan
+                await runCmd("npm install --production 2>/dev/null");
+
+                // Step 3: Notify success
+                const log = await runCmd("git log --oneline -3");
+                await ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null,
+                    `✅ <b>Update Berhasil!</b>\n\n` +
+                    `📦 Latest commits:\n<code>${escapeHtml(log.stdout)}</code>\n\n` +
+                    `🔄 Bot akan restart dalam 3 detik...`,
+                    { parse_mode: "HTML" });
+
+                // Step 4: Restart via PM2
+                setTimeout(async () => {
+                    try {
+                        const restart = await runCmd("pm2 restart DIGICORE");
+                        if (restart.error) {
+                            // Fallback: restart manual
+                            process.exit(0);
+                        }
+                    } catch (e) {
+                        process.exit(0);
+                    }
+                }, 3000);
+                break;
             }
 
 
