@@ -108,7 +108,7 @@ Halo, @${ctx.from.username || "—"}
 ━━━━━━━━━━━━━━━━━━━━
 🛡️ Trusted • ⚡ Instan • 💎 Premium
 
-/${config.prefix === "/" ? "" : config.prefix}profile • /history • /rating • /support`;
+/${config.prefix === "/" ? "" : config.prefix}info • /riwayat • /rating • /support`;
 };
 
 const menuTextOwn = () => `<blockquote>( ⸙‌ ) 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐰𝐧𝐞𝐫 𝐌𝐞𝐧𝐮
@@ -280,7 +280,7 @@ module.exports = (bot) => {
                 return ctx.reply(menuTextBot(ctx), { parse_mode: "HTML", reply_markup: mainKeyboard(ctx) });
             }
 
-            case "profile": {
+            case "info": case "profile": {
                 const users = loadUsers();
                 const user = users.find(u => u.id === fromId);
                 if (!user) return ctx.reply("❌ User tidak ditemukan.");
@@ -288,7 +288,7 @@ module.exports = (bot) => {
                 return ctx.reply(profileText, { parse_mode: "HTML" });
             }
 
-            case "history": {
+            case "riwayat": case "history": {
                 const users = loadUsers();
                 const user = users.find(u => u.id === fromId);
                 if (!user || !user.history || user.history.length === 0) return ctx.reply("Belum ada riwayat transaksi.");
