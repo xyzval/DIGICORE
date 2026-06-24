@@ -777,25 +777,30 @@ module.exports = (bot) => {
             // ===== ADD STOCK VPS =====
             case "addstockvps": {
                 if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
-                if (!text.includes("|")) return ctx.reply(`Format:\n<code>${config.prefix}addstockvps kategori|keterangan|data akun|harga</code>\n<code>${config.prefix}addstockvps kategori|keterangan|data akun|harga garansi|harga no garansi</code>\n\nContoh 1 harga (markup otomatis +Rp${toRupiah(config.garansiMarkup || 10000)}):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|IP: 1.2.3.4\\nUser: root\\nPass: xxx|25000</code>\n\nContoh 2 harga (manual):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|IP: 1.2.3.4\\nUser: root\\nPass: xxx|35000|25000</code>`, { parse_mode: "HTML" });
+                if (!text.includes("|")) return ctx.reply(`Format:\n<code>${config.prefix}addstockvps kategori|keterangan|IP|PORT|USER|PASSWORD|harga</code>\n\nContoh 1 harga (markup otomatis +Rp${toRupiah(config.garansiMarkup || 10000)}):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|1.2.3.4|22022|root|abc123|25000</code>\n\nContoh 2 harga (manual):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|1.2.3.4|22022|root|abc123|35000|25000</code>`, { parse_mode: "HTML" });
                 const parts = text.split("|").map(v => v.trim());
-                if (parts.length < 4) return ctx.reply("Format tidak valid! Minimal: kategori|keterangan|data akun|harga");
+                if (parts.length < 7) return ctx.reply("Format tidak valid! Minimal: kategori|keterangan|IP|PORT|USER|PASSWORD|harga");
                 const category = parts[0];
                 const description = parts[1];
-                const accountData = parts[2];
+                const ip = parts[2];
+                const port = parts[3];
+                const user = parts[4];
+                const password = parts[5];
+                const accountData = `IP: ${ip}\nPORT: ${port}\nUSER: ${user}\nPASSWORD: ${password}`;
+
                 let priceGaransi, priceNoGaransi;
 
-                if (parts.length >= 5 && !isNaN(parseInt(parts[3])) && !isNaN(parseInt(parts[4]))) {
+                if (parts.length >= 8 && !isNaN(parseInt(parts[6])) && !isNaN(parseInt(parts[7]))) {
                     // Manual 2 harga
-                    priceGaransi = parseInt(parts[3]);
-                    priceNoGaransi = parseInt(parts[4]);
+                    priceGaransi = parseInt(parts[6]);
+                    priceNoGaransi = parseInt(parts[7]);
                 } else {
                     // 1 harga → auto markup
-                    priceNoGaransi = parseInt(parts[3]);
+                    priceNoGaransi = parseInt(parts[6]);
                     priceGaransi = priceNoGaransi + (config.garansiMarkup || 10000);
                 }
 
-                if (!category || !description || !accountData || isNaN(priceNoGaransi)) return ctx.reply("Data tidak valid!");
+                if (!category || !description || !ip || !port || !user || !password || isNaN(priceNoGaransi)) return ctx.reply("Data tidak valid!");
                 const vpsData = loadVps();
                 if (!vpsData[category]) vpsData[category] = [];
                 let existing = vpsData[category].find(i => i.description.toLowerCase() === description.toLowerCase() && i.priceNoGaransi === priceNoGaransi);
@@ -803,7 +808,7 @@ module.exports = (bot) => {
                 else { vpsData[category].push({ description, price: priceGaransi, priceGaransi, priceNoGaransi, stock: 1, accounts: [accountData], added_date: new Date().toISOString() }); }
                 saveVps(vpsData);
                 const totalInCat = vpsData[category].reduce((s, i) => s + i.accounts.length, 0);
-                return ctx.reply(`✅ <b>Stock VPS Berhasil ditambahkan!</b>\n\n📁 Kategori: ${escapeHtml(category)}\n📝 Keterangan: ${escapeHtml(description)}\n🛡️ Harga Garansi: Rp${toRupiah(priceGaransi)}\n⚡ Harga No Garansi: Rp${toRupiah(priceNoGaransi)}\n📦 Total stok kategori: ${totalInCat}`, { parse_mode: "HTML" });
+                return ctx.reply(`✅ <b>Stock VPS Berhasil ditambahkan!</b>\n\n📁 Kategori: ${escapeHtml(category)}\n📝 Keterangan: ${escapeHtml(description)}\n🌐 IP: ${escapeHtml(ip)}\n🔌 Port: ${escapeHtml(port)}\n👤 User: ${escapeHtml(user)}\n🔑 Pass: ${escapeHtml(password)}\n🛡️ Harga Garansi: Rp${toRupiah(priceGaransi)}\n⚡ Harga Dasar: Rp${toRupiah(priceNoGaransi)}\n📦 Total stok kategori: ${totalInCat}`, { parse_mode: "HTML" });
             }
 
             // ===== DEL STOCK VPS =====
