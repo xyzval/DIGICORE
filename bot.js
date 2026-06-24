@@ -994,6 +994,10 @@ module.exports = (bot) => {
         const paketLabel = hasGaransi ? `🛡️ Garansi ${garansiDaysUsed} Hari` : `⚡ Garansi ${garansiDaysUsed} Hari`;
         const paymentType = config.paymentGateway;
 
+        // Ambil info SSD dari data akun
+        const getValFromAccount = (label) => { const acc = item.accounts[0] || ""; const line = String(acc).split("\n").find(v => v.toLowerCase().startsWith(label.toLowerCase() + ":")); return line ? line.split(":").slice(1).join(":").trim() : ""; };
+        const storageInfo = getValFromAccount("SSD");
+
         let pay;
         try {
             pay = await createPayment(paymentType, price, config, { customerName: `@${ctx.from.username || ctx.from.first_name}` });
@@ -1007,7 +1011,7 @@ module.exports = (bot) => {
         let qrMsg;
         try {
             const photo = paymentType === "pakasir" ? { source: pay.qris } : pay.qris;
-            qrMsg = await ctx.replyWithPhoto(photo, { caption: `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐏𝐚𝐲𝐦𝐞𝐧𝐭\n━━━━━━━━━━━━━━━━━━━━\n\n⟢ Produk   : ${name}\n⟢ Paket    : ${paketLabel}\n⟢ Total    : Rp${toRupiah(price)}\n\n━━━━━━━━━━━━━━━━━━━━\n⏳ Expired: 6 Menit\n📲 Scan QRIS untuk pembayaran`, parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan", callback_data: "cancel_order" }]] } });
+            qrMsg = await ctx.replyWithPhoto(photo, { caption: `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐏𝐚𝐲𝐦𝐞𝐧𝐭\n━━━━━━━━━━━━━━━━━━━━\n\n⟢ Produk   : ${name}\n⟢ Storage  : ${storageInfo || "-"}\n⟢ Paket    : ${paketLabel}\n⟢ Total    : Rp${toRupiah(price)}\n\n━━━━━━━━━━━━━━━━━━━━\n⏳ Expired: 6 Menit\n📲 Scan QRIS untuk pembayaran`, parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan", callback_data: "cancel_order" }]] } });
         } catch (err) {
             console.error("[SEND QR ERROR]", err.message);
             delete orders[userId];
