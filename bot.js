@@ -108,7 +108,7 @@ Halo, @${ctx.from.username || "—"}
 ━━━━━━━━━━━━━━━━━━━━
 🛡️ Trusted • ⚡ Instan • 💎 Premium
 
-/${config.prefix === "/" ? "" : config.prefix}profile • /history • /review • /support`;
+/${config.prefix === "/" ? "" : config.prefix}profile • /history • /rating • /support`;
 };
 
 const menuTextOwn = () => `<blockquote>( ⸙‌ ) 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐰𝐧𝐞𝐫 𝐌𝐞𝐧𝐮
@@ -299,7 +299,7 @@ module.exports = (bot) => {
                 return ctx.reply(hText, { parse_mode: "HTML" });
             }
 
-            case "review": case "reviews": {
+            case "rating": case "review": case "reviews": {
                 const reviews = loadReviews();
                 if (reviews.length === 0) return ctx.reply("Belum ada review.");
                 const avg = (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1);
