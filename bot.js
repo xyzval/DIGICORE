@@ -1043,7 +1043,7 @@ module.exports = (bot) => {
                     const getVal = (label) => { const line = String(sentVps).split("\n").find(v => v.toLowerCase().startsWith(label.toLowerCase() + ":")); return line ? line.split(":").slice(1).join(":").trim() : "-"; };
                     const ip = getVal("IP"); const port = getVal("PORT"); const user = getVal("USER"); const password = getVal("PASSWORD");
 
-                    const vpsText = `<blockquote>✅ VPS/RDP BERHASIL\n\nIP : ${ip}\nPORT : ${port}\nUSER : ${user}\nPASSWORD : ${password}\n\nTerima kasih sudah order di DIGICORE.</blockquote>`;
+                    const vpsText = `<blockquote>◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫 𝐂𝐨𝐧𝐟𝐢𝐫𝐦𝐞𝐝\n\n┏━━━━━━━━━━━━━━━━━━━┓\n┃  ✅ PEMBAYARAN SUKSES\n┗━━━━━━━━━━━━━━━━━━━┛\n\n⟢ Produk  : ${escapeHtml(o.name)}\n⟢ Harga   : Rp${toRupiah(o.amount)}\n\n━━━ 𝐀𝐤𝐬𝐞𝐬 𝐒𝐞𝐫𝐯𝐞𝐫 ━━━\n\n🌐 IP       : ${ip}\n🔌 Port     : ${port}\n👤 User     : ${user}\n🔑 Pass     : ${password}\n\n━━━ 𝐈𝐧𝐟𝐨𝐫𝐦𝐚𝐬𝐢 ━━━\n\n📅 Tanggal    : ${new Date().toLocaleDateString("id-ID")}\n🛡️ Garansi    : 7 Hari\n⚠️ Claim      : /claimgaransi\n\nTerima kasih telah mempercayai DIGICORE 🙏</blockquote>`;
                     try { await ctx.telegram.sendMessage(o.chatId, vpsText, { parse_mode: "HTML" }); } catch (e) {
                         await ctx.telegram.sendMessage(o.chatId, `✅ VPS/RDP BERHASIL\n\nData:\n${sentVps}\n\nTerima kasih!`);
                     }
