@@ -898,19 +898,18 @@ module.exports = (bot) => {
         try { await ctx.answerCbQuery(); } catch {}
         const vpsData = loadVps();
         const categories = Object.keys(vpsData);
-        if (categories.length === 0) return ctx.reply("Stok VPS/RDP sedang kosong.");
+        if (categories.length === 0) return ctx.editMessageText("Stok VPS/RDP sedang kosong.", { parse_mode: "HTML" });
         const btns = categories.map(cat => {
             const totalStok = vpsData[cat].reduce((s, i) => s + (i.accounts ? i.accounts.length : 0), 0);
             return [{ text: `${cat} • ${totalStok} tersedia`, callback_data: `vps_category_buy|${cat}` }];
         });
         btns.push([{ text: "↩️ Kembali", callback_data: "back_to_menu" }]);
-        return ctx.reply(`◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫\n━━━━━━━━━━━━━━━━━━━━\n\nPilih kategori server:`, { parse_mode: "HTML", reply_markup: { inline_keyboard: btns } });
+        return ctx.editMessageText(`◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫\n━━━━━━━━━━━━━━━━━━━━\n\nPilih kategori server:`, { parse_mode: "HTML", reply_markup: { inline_keyboard: btns } });
     });
 
     bot.action("back_to_menu", async (ctx) => {
         try { await ctx.answerCbQuery(); } catch {}
-        await ctx.deleteMessage();
-        return ctx.reply(menuTextBot(ctx), { parse_mode: "HTML", reply_markup: mainKeyboard(ctx) });
+        return ctx.editMessageText(menuTextBot(ctx), { parse_mode: "HTML", reply_markup: mainKeyboard(ctx) });
     });
 
     bot.action("show_review", async (ctx) => {
@@ -956,9 +955,9 @@ module.exports = (bot) => {
         const index = parseInt(indexStr);
         const vpsData = loadVps();
         const items = vpsData[category];
-        if (!items || !items[index]) return ctx.reply("❌ Item tidak ditemukan!");
+        if (!items || !items[index]) return ctx.editMessageText("❌ Item tidak ditemukan!", { parse_mode: "HTML" });
         const item = items[index];
-        if (!item.accounts || item.accounts.length === 0) return ctx.reply("❌ Stok habis!");
+        if (!item.accounts || item.accounts.length === 0) return ctx.editMessageText("❌ Stok habis!", { parse_mode: "HTML" });
 
         const priceGaransi = item.priceGaransi || item.price;
         const priceNoGaransi = item.priceNoGaransi || item.price;
@@ -975,7 +974,7 @@ module.exports = (bot) => {
     // VPS pay - process payment after warranty choice
     bot.action(/vps_pay\|(.+)/, async (ctx) => {
         try { await ctx.answerCbQuery(); } catch {}
-        await ctx.deleteMessage();
+        try { await ctx.deleteMessage(); } catch {}
         const [category, indexStr, warrantyType] = ctx.match[1].split("|");
         const index = parseInt(indexStr);
         const vpsData = loadVps();
