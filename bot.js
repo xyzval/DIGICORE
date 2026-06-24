@@ -13,6 +13,7 @@ const vpsDB = path.join(__dirname, "/database/vps.json");
 const reviewDB = path.join(__dirname, "/database/reviews.json");
 const blacklistDB = path.join(__dirname, "/database/blacklist.json");
 const ticketDB = path.join(__dirname, "/database/tickets.json");
+const claimDB = path.join(__dirname, "/database/claims.json");
 const orders = {};
 const pendingReviews = {};
 
@@ -22,6 +23,7 @@ if (!fs.existsSync(vpsDB)) fs.writeFileSync(vpsDB, "{}");
 if (!fs.existsSync(reviewDB)) fs.writeFileSync(reviewDB, "[]");
 if (!fs.existsSync(blacklistDB)) fs.writeFileSync(blacklistDB, "[]");
 if (!fs.existsSync(ticketDB)) fs.writeFileSync(ticketDB, "[]");
+if (!fs.existsSync(claimDB)) fs.writeFileSync(claimDB, "[]");
 
 // Load/Save functions
 const loadUsers = () => JSON.parse(fs.readFileSync(userDB));
@@ -34,6 +36,8 @@ const loadBlacklist = () => JSON.parse(fs.readFileSync(blacklistDB));
 const saveBlacklist = (d) => fs.writeFileSync(blacklistDB, JSON.stringify(d, null, 2));
 const loadTickets = () => JSON.parse(fs.readFileSync(ticketDB));
 const saveTickets = (d) => fs.writeFileSync(ticketDB, JSON.stringify(d, null, 2));
+const loadClaims = () => JSON.parse(fs.readFileSync(claimDB));
+const saveClaims = (d) => fs.writeFileSync(claimDB, JSON.stringify(d, null, 2));
 const isBlacklisted = (userId) => {
     const blacklist = loadBlacklist();
     return blacklist.some(b => String(b.id) === String(userId));
@@ -128,6 +132,10 @@ const menuTextOwn = () => `<blockquote>( ⸙‌ ) 𝐃𝐈𝐆𝐈𝐂𝐎𝐑�
 ▢ ${config.prefix}tickets
 ▢ ${config.prefix}reply
 ▢ ${config.prefix}closeticket
+▢ ${config.prefix}claims
+▢ ${config.prefix}approve
+▢ ${config.prefix}reject
+▢ ${config.prefix}sendclaim
 </blockquote>`;
 
 const mainKeyboard = (ctx) => {
@@ -204,7 +212,7 @@ module.exports = (bot) => {
 
         // Maintenance check
         if (config.maintenance && !isOwner(ctx) && isCmd) {
-            const allowedInMaint = ["menu", "start", "profile", "history", "support", "ticket", "cektiket", "myticket", "tiket"];
+            const allowedInMaint = ["menu", "start", "profile", "history", "support", "ticket", "cektiket", "myticket", "tiket", "claim", "cekclaim", "myclaim"];
             if (!allowedInMaint.includes(command)) return ctx.reply("🔧 Bot sedang dalam pemeliharaan.\nSilakan coba lagi nanti.");
         }
 
@@ -459,6 +467,197 @@ module.exports = (bot) => {
                 saveTickets(tickets);
                 try { await ctx.telegram.sendMessage(tickets[idx].userId, `🔴 <b>Tiket #${text} Ditutup</b>\n\nJika masih ada masalah, buat tiket baru.`, { parse_mode: "HTML" }); } catch (e) {}
                 return ctx.reply(`✅ Tiket <b>#${text}</b> ditutup.`, { parse_mode: "HTML" });
+            }
+
+
+            // ===== CLAIM GARANSI (USER) =====
+            case "claim": {
+                if (!text) return ctx.reply(`🛡️ <b>Claim Garansi:</b>\n<code>${config.prefix}claim [alasan]</code>\n\nContoh: <code>${config.prefix}claim VPS mati tidak bisa diakses</code>`, { parse_mode: "HTML" });
+                const users = loadUsers();
+                const user = users.find(u => u.id === fromId);
+                if (!user || !user.history || user.history.length === 0) return ctx.reply("❌ Anda belum pernah order. Tidak ada garansi aktif.");
+
+                // Cek apakah ada pembelian yang masih dalam masa garansi (7 hari default)
+                const now = Date.now();
+                const GARANSI_DAYS = 7;
+                const activeOrders = user.history.filter(h => {
+                    const orderTime = new Date(h.timestamp).getTime();
+                    const expiry = orderTime + (GARANSI_DAYS * 24 * 60 * 60 * 1000);
+                    return now <= expiry;
+                });
+
+                if (activeOrders.length === 0) return ctx.reply("❌ Tidak ada garansi aktif.\n\nMasa garansi: 7 hari sejak pembelian.");
+
+                // Cek apakah sudah pernah claim untuk order terakhir
+                const claims = loadClaims();
+                const lastOrder = activeOrders[activeOrders.length - 1];
+                const alreadyClaimed = claims.find(c => c.userId === fromId && c.product === lastOrder.product && c.orderTimestamp === lastOrder.timestamp && c.status !== "rejected");
+                if (alreadyClaimed) return ctx.reply(`⚠️ Anda sudah memiliki claim aktif untuk <b>${escapeHtml(lastOrder.product)}</b>.\n\nStatus: ${alreadyClaimed.status === "pending" ? "⏳ Menunggu" : alreadyClaimed.status === "approved" ? "✅ Disetujui" : "❌ Ditolak"}\n\nCek: <code>${config.prefix}cekclaim</code>`, { parse_mode: "HTML" });
+
+                const claimId = String(claims.length + 1).padStart(3, "0");
+                const orderTime = new Date(lastOrder.timestamp).getTime();
+                const expiryDate = new Date(orderTime + (GARANSI_DAYS * 24 * 60 * 60 * 1000));
+
+                claims.push({
+                    id: claimId,
+                    userId: fromId,
+                    username: userName,
+                    product: lastOrder.product,
+                    amount: lastOrder.amount,
+                    orderTimestamp: lastOrder.timestamp,
+                    garansiExpiry: expiryDate.toISOString(),
+                    reason: text,
+                    status: "pending",
+                    adminReply: null,
+                    newAccount: null,
+                    created_at: new Date().toISOString(),
+                    resolved_at: null
+                });
+                saveClaims(claims);
+
+                await ctx.reply(`🛡️ <b>Claim Garansi #${claimId} Dibuat!</b>\n\n📦 Produk: ${escapeHtml(lastOrder.product)}\n📝 Alasan: ${escapeHtml(text)}\n⏳ Garansi berlaku sampai: ${expiryDate.toLocaleDateString("id-ID")}\n\n⏳ Menunggu persetujuan admin.\n\nCek status: <code>${config.prefix}cekclaim</code>`, { parse_mode: "HTML" });
+
+                // Notif ke owner
+                try {
+                    await ctx.telegram.sendMessage(config.ownerId,
+                        `🛡️ <b>CLAIM GARANSI BARU! #${claimId}</b>\n\n` +
+                        `👤 @${escapeHtml(userName)} (<code>${fromId}</code>)\n` +
+                        `📦 Produk: ${escapeHtml(lastOrder.product)}\n` +
+                        `💰 Harga: Rp${toRupiah(lastOrder.amount)}\n` +
+                        `📅 Beli: ${new Date(lastOrder.timestamp).toLocaleDateString("id-ID")}\n` +
+                        `📝 Alasan: ${escapeHtml(text)}\n\n` +
+                        `✅ <code>${config.prefix}approve ${claimId}</code>\n` +
+                        `❌ <code>${config.prefix}reject ${claimId} [alasan]</code>`,
+                        { parse_mode: "HTML" });
+                } catch (e) {}
+                return;
+            }
+
+            // ===== CEK CLAIM (USER) =====
+            case "cekclaim": case "myclaim": {
+                const claims = loadClaims();
+                const myClaims = claims.filter(c => c.userId === fromId);
+                if (myClaims.length === 0) return ctx.reply("Belum ada claim garansi.");
+
+                if (text) {
+                    const c = myClaims.find(c2 => c2.id === text.replace("#", ""));
+                    if (!c) return ctx.reply("❌ Claim tidak ditemukan.");
+                    const statusIcon = c.status === "pending" ? "⏳" : c.status === "approved" ? "✅" : "❌";
+                    let detail = `🛡️ <b>Claim #${c.id}</b> ${statusIcon}\n\n` +
+                        `📦 Produk: ${escapeHtml(c.product)}\n` +
+                        `📝 Alasan: ${escapeHtml(c.reason)}\n` +
+                        `📅 Diajukan: ${new Date(c.created_at).toLocaleDateString("id-ID")}\n` +
+                        `🛡️ Garansi sampai: ${new Date(c.garansiExpiry).toLocaleDateString("id-ID")}\n` +
+                        `📊 Status: <b>${c.status.toUpperCase()}</b>\n`;
+                    if (c.adminReply) detail += `\n💬 Admin: ${escapeHtml(c.adminReply)}`;
+                    if (c.newAccount) detail += `\n\n🔑 <b>Akun Pengganti:</b>\n<code>${escapeHtml(c.newAccount)}</code>`;
+                    return ctx.reply(detail, { parse_mode: "HTML" });
+                }
+
+                let cText = `🛡️ <b>Claim Garansi Anda</b>\n\n`;
+                [...myClaims].reverse().slice(0, 5).forEach(c => {
+                    const statusIcon = c.status === "pending" ? "⏳" : c.status === "approved" ? "✅" : "❌";
+                    cText += `<b>#${c.id}</b> ${statusIcon} | ${escapeHtml(c.product)}\n📝 ${escapeHtml(c.reason.substring(0, 40))}...\n\n`;
+                });
+                cText += `<i>Detail: <code>${config.prefix}cekclaim [ID]</code></i>`;
+                return ctx.reply(cText, { parse_mode: "HTML" });
+            }
+
+            // ===== CLAIMS LIST (OWNER) =====
+            case "claims": case "allclaim": {
+                if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
+                const claims = loadClaims();
+                const pending = claims.filter(c => c.status === "pending");
+                if (pending.length === 0) return ctx.reply("✅ Tidak ada claim pending.");
+                let cText = `🛡️ <b>Claim Pending</b> (${pending.length})\n\n`;
+                [...pending].reverse().slice(0, 10).forEach(c => {
+                    cText += `<b>#${c.id}</b> 👤 @${escapeHtml(c.username)}\n📦 ${escapeHtml(c.product)}\n📝 ${escapeHtml(c.reason.substring(0, 50))}\n✅ <code>${config.prefix}approve ${c.id}</code> | ❌ <code>${config.prefix}reject ${c.id}</code>\n\n`;
+                });
+                return ctx.reply(cText, { parse_mode: "HTML" });
+            }
+
+            // ===== APPROVE CLAIM (OWNER) =====
+            case "approve": {
+                if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
+                if (!text) return ctx.reply(`Format: <code>${config.prefix}approve [ID] [akun pengganti]</code>\n\nContoh: <code>${config.prefix}approve 001 IP: 1.2.3.4\\nUser: root\\nPass: abc123</code>`, { parse_mode: "HTML" });
+                const parts = text.split(" ");
+                const claimId = parts[0].replace("#", "");
+                const newAccount = parts.slice(1).join(" ") || null;
+
+                const claims = loadClaims();
+                const idx = claims.findIndex(c => c.id === claimId);
+                if (idx === -1) return ctx.reply("❌ Claim tidak ditemukan.");
+                if (claims[idx].status !== "pending") return ctx.reply(`⚠️ Claim #${claimId} sudah di-${claims[idx].status}.`);
+
+                claims[idx].status = "approved";
+                claims[idx].newAccount = newAccount;
+                claims[idx].resolved_at = new Date().toISOString();
+                saveClaims(claims);
+
+                // Notif ke user
+                let userMsg = `✅ <b>Claim Garansi #${claimId} DISETUJUI!</b>\n\n📦 Produk: ${escapeHtml(claims[idx].product)}\n`;
+                if (newAccount) {
+                    userMsg += `\n🔑 <b>Akun Pengganti:</b>\n<blockquote>${escapeHtml(newAccount)}</blockquote>\n`;
+                } else {
+                    userMsg += `\n⏳ Admin akan mengirim akun pengganti segera.\nGunakan <code>${config.prefix}cekclaim ${claimId}</code> untuk cek update.`;
+                }
+                try { await ctx.telegram.sendMessage(claims[idx].userId, userMsg, { parse_mode: "HTML" }); } catch (e) {}
+
+                return ctx.reply(`✅ Claim <b>#${claimId}</b> approved!${newAccount ? " Akun pengganti terkirim." : " Kirim akun nanti: " + config.prefix + "sendclaim " + claimId + " [data akun]"}`, { parse_mode: "HTML" });
+            }
+
+            // ===== REJECT CLAIM (OWNER) =====
+            case "reject": {
+                if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
+                if (!text) return ctx.reply(`Format: <code>${config.prefix}reject [ID] [alasan]</code>`, { parse_mode: "HTML" });
+                const parts2 = text.split(" ");
+                const claimId2 = parts2[0].replace("#", "");
+                const reason = parts2.slice(1).join(" ") || "Tidak memenuhi syarat garansi";
+
+                const claims = loadClaims();
+                const idx2 = claims.findIndex(c => c.id === claimId2);
+                if (idx2 === -1) return ctx.reply("❌ Claim tidak ditemukan.");
+                if (claims[idx2].status !== "pending") return ctx.reply(`⚠️ Claim #${claimId2} sudah di-${claims[idx2].status}.`);
+
+                claims[idx2].status = "rejected";
+                claims[idx2].adminReply = reason;
+                claims[idx2].resolved_at = new Date().toISOString();
+                saveClaims(claims);
+
+                // Notif ke user
+                try {
+                    await ctx.telegram.sendMessage(claims[idx2].userId,
+                        `❌ <b>Claim Garansi #${claimId2} DITOLAK</b>\n\n📦 Produk: ${escapeHtml(claims[idx2].product)}\n📝 Alasan: ${escapeHtml(reason)}\n\nHubungi admin jika ada pertanyaan.`,
+                        { parse_mode: "HTML" });
+                } catch (e) {}
+
+                return ctx.reply(`❌ Claim <b>#${claimId2}</b> ditolak. User sudah dinotifikasi.`, { parse_mode: "HTML" });
+            }
+
+            // ===== SEND CLAIM ACCOUNT (OWNER) =====
+            case "sendclaim": {
+                if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
+                if (!text || !text.includes(" ")) return ctx.reply(`Format: <code>${config.prefix}sendclaim [ID] [data akun]</code>`, { parse_mode: "HTML" });
+                const parts3 = text.split(" ");
+                const claimId3 = parts3[0].replace("#", "");
+                const accountData = parts3.slice(1).join(" ");
+
+                const claims = loadClaims();
+                const idx3 = claims.findIndex(c => c.id === claimId3);
+                if (idx3 === -1) return ctx.reply("❌ Claim tidak ditemukan.");
+                if (claims[idx3].status !== "approved") return ctx.reply("⚠️ Claim belum di-approve.");
+
+                claims[idx3].newAccount = accountData;
+                saveClaims(claims);
+
+                // Kirim ke user
+                try {
+                    await ctx.telegram.sendMessage(claims[idx3].userId,
+                        `🔑 <b>Akun Pengganti (Garansi #${claimId3})</b>\n\n📦 Produk: ${escapeHtml(claims[idx3].product)}\n\n<blockquote>${escapeHtml(accountData)}</blockquote>\n\nTerima kasih telah menggunakan DIGICORE! 🙏`,
+                        { parse_mode: "HTML" });
+                } catch (e) {}
+
+                return ctx.reply(`✅ Akun pengganti terkirim ke user untuk claim <b>#${claimId3}</b>`, { parse_mode: "HTML" });
             }
 
 
