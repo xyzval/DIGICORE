@@ -146,17 +146,7 @@ const snkText = `<b>Syarat & Ketentuan DIGICORE</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Garansi:</b>
 - Garansi aktif 1x replace sejak tanggal pembelian.
-- Masa garansi sesuai paket yang dibeli.
-
-<b>Penyebab garansi hangus:</b>
-- Penggunaan untuk mining, kripto, hacking, atau aktivitas ilegal.
-- Penggunaan resource berlebihan yang merugikan pengguna lain.
-- Spamming atau tindakan merusak server.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b>⚠️ TOS:</b> Melanggar TOS akan mengakhiri layanan tanpa refund.
-
-Pastikan membaca aturan sebelum pembelian.`;
+- Masa garansi sesuai paket yang dibeli.`;
 
 function addUser(userData) {
     const users = loadUsers();
