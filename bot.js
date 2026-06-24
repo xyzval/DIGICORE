@@ -585,7 +585,7 @@ module.exports = (bot) => {
         });
         return ctx.reply(rText, { parse_mode: "HTML" });
     });
-    bot.action("show_ticket", async (ctx) => { try { await ctx.answerCbQuery(); } catch {} ctx.reply(`Buat tiket: <code>${config.prefix}ticket [pesan]</code>\nCek tiket: <code>${config.prefix}cektiket</code>`, { parse_mode: "HTML" }); });
+    bot.action("show_ticket", async (ctx) => { try { await ctx.answerCbQuery(); } catch {} ctx.reply(`Buat tiket: <code>${config.prefix}support [pesan]</code>\nCek tiket: <code>${config.prefix}cektiket</code>`, { parse_mode: "HTML" }); });
     bot.action("owner_menu", async (ctx) => { try { await ctx.answerCbQuery(); } catch {} return ctx.reply(menuTextOwn(), { parse_mode: "HTML" }); });
     bot.action("snk_menu", async (ctx) => { try { await ctx.answerCbQuery(); } catch {} return ctx.reply(snkText, { parse_mode: "HTML" }); });
 
