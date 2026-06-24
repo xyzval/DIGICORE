@@ -82,11 +82,18 @@ async function autoCloseTickets(bot) {
     }
   }
 
-  await bot.telegram.setMyCommands([
-    { command: "menu", description: "Tampilkan Menu Utama" },
-    { command: "buyvps", description: "Beli VPS / RDP" },
-    { command: "support", description: "Buat Tiket Support" }
-  ]);
+  // ===== Force update bot commands =====
+  try {
+    await bot.telegram.deleteMyCommands();
+    await bot.telegram.setMyCommands([
+      { command: "menu", description: "Tampilkan Menu Utama" },
+      { command: "buyvps", description: "Beli VPS / RDP" },
+      { command: "support", description: "Buat Tiket Support" }
+    ]);
+    console.log("• Bot commands updated");
+  } catch (err) {
+    console.warn("⚠️  Gagal update commands:", err.message);
+  }
   console.log("• DIGICORE Bot Connected");
 
   startAutoBackup(bot);
