@@ -318,8 +318,11 @@ module.exports = (bot) => {
                 const vpsData = loadVps();
                 const categories = Object.keys(vpsData);
                 if (categories.length === 0) return ctx.reply("Stok VPS/RDP sedang kosong.");
-                const btns = categories.map(cat => [{ text: `💻 ${cat.charAt(0).toUpperCase() + cat.slice(1)}`, callback_data: `vps_category_buy|${cat}` }]);
-                return ctx.reply("💻 *Pilih Kategori VPS/RDP:*", { parse_mode: "Markdown", reply_markup: { inline_keyboard: btns } });
+                const btns = categories.map(cat => {
+                    const totalStok = vpsData[cat].reduce((s, i) => s + (i.accounts ? i.accounts.length : 0), 0);
+                    return [{ text: `${cat} • ${totalStok} tersedia`, callback_data: `vps_category_buy|${cat}` }];
+                });
+                return ctx.reply(`◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫\n━━━━━━━━━━━━━━━━━━━━\n\nPilih kategori server:`, { parse_mode: "HTML", reply_markup: { inline_keyboard: btns } });
             }
 
             // ===== STATS (OWNER) =====
@@ -839,8 +842,11 @@ module.exports = (bot) => {
         const vpsData = loadVps();
         const categories = Object.keys(vpsData);
         if (categories.length === 0) return ctx.reply("Stok VPS/RDP sedang kosong.");
-        const btns = categories.map(cat => [{ text: `💻 ${cat.charAt(0).toUpperCase() + cat.slice(1)}`, callback_data: `vps_category_buy|${cat}` }]);
-        return ctx.reply("💻 *Pilih Kategori VPS/RDP:*", { parse_mode: "Markdown", reply_markup: { inline_keyboard: btns } });
+        const btns = categories.map(cat => {
+            const totalStok = vpsData[cat].reduce((s, i) => s + (i.accounts ? i.accounts.length : 0), 0);
+            return [{ text: `${cat} • ${totalStok} tersedia`, callback_data: `vps_category_buy|${cat}` }];
+        });
+        return ctx.reply(`◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫\n━━━━━━━━━━━━━━━━━━━━\n\nPilih kategori server:`, { parse_mode: "HTML", reply_markup: { inline_keyboard: btns } });
     });
 
     bot.action("show_review", async (ctx) => {
@@ -874,9 +880,9 @@ module.exports = (bot) => {
         const vpsData = loadVps();
         const items = vpsData[category];
         if (!items || items.length === 0) return ctx.reply("❌ Stok kosong.");
-        const btns = items.map((item, i) => [{ text: `💻 ${item.description} - Rp${toRupiah(item.price)} (stok ${item.accounts.length})`, callback_data: `vps_buy_item|${category}|${i}` }]);
+        const btns = items.map((item, i) => [{ text: `${item.description} • Rp${toRupiah(item.price)} • stok ${item.accounts.length}`, callback_data: `vps_buy_item|${category}|${i}` }]);
         btns.push([{ text: "↩️ Kembali", callback_data: "buy_vps" }]);
-        return ctx.editMessageText(`💻 *${category.toUpperCase()}*\n\nPilih VPS/RDP:`, { parse_mode: "Markdown", reply_markup: { inline_keyboard: btns } });
+        return ctx.editMessageText(`◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — ${escapeHtml(category)}\n━━━━━━━━━━━━━━━━━━━━\n\nPilih server:`, { parse_mode: "HTML", reply_markup: { inline_keyboard: btns } });
     });
 
     // VPS buy item
