@@ -121,6 +121,7 @@ const menuTextOwn = () => `<blockquote>( ⸙‌ ) 𝐃𝐈𝐆𝐈𝐂𝐎𝐑�
 ▢ ${config.prefix}backup
 ▢ ${config.prefix}broadcast
 ▢ ${config.prefix}maintenance
+▢ ${config.prefix}editgaransi
 ▢ ${config.prefix}addstockvps
 ▢ ${config.prefix}delstockvps
 ▢ ${config.prefix}getstockvps
@@ -142,7 +143,7 @@ const mainKeyboard = (ctx) => {
     const keyboard = [
         [{ text: "💻 Order VPS/RDP", callback_data: "buy_vps" }],
         // [{ text: "⭐ Review", callback_data: "show_review" }, { text: "🎫 Support", callback_data: "show_ticket" }],
-        [{ text: "📜 Terms & Conditions", callback_data: "snk_menu" }]
+        [{ text: "🛡️ Sistem Garansi", callback_data: "snk_menu" }]
     ];
     if (isOwner(ctx)) keyboard.push([{ text: "🕊️ Owner Menu", callback_data: "owner_menu" }]);
     return { inline_keyboard: keyboard };
@@ -155,6 +156,16 @@ const snkText = `<b>Syarat & Ketentuan DIGICORE</b>
 <b>Garansi:</b>
 - Garansi aktif 1x replace sejak tanggal pembelian.
 - Masa garansi sesuai paket yang dibeli.`;
+
+// Load/save garansi text (editable by owner)
+const garansiFile = path.join(__dirname, "database/garansi.txt");
+function loadGaransiText() {
+    if (fs.existsSync(garansiFile)) return fs.readFileSync(garansiFile, "utf-8");
+    return snkText;
+}
+function saveGaransiText(text) {
+    fs.writeFileSync(garansiFile, text, "utf-8");
+}
 
 function addUser(userData) {
     const users = loadUsers();
@@ -346,6 +357,17 @@ module.exports = (bot) => {
                 if (text === "on") { config.maintenance = true; return ctx.reply("🔧 Maintenance mode <b>AKTIF</b>.\nUser tidak bisa order.", { parse_mode: "HTML" }); }
                 if (text === "off") { config.maintenance = false; return ctx.reply("✅ Maintenance mode <b>NONAKTIF</b>.\nBot kembali normal.", { parse_mode: "HTML" }); }
                 return ctx.reply(`Status: ${config.maintenance ? "🔧 ON" : "✅ OFF"}\n\nGunakan:\n<code>${config.prefix}maintenance on</code>\n<code>${config.prefix}maintenance off</code>`, { parse_mode: "HTML" });
+            }
+
+            // ===== EDIT GARANSI (OWNER) =====
+            case "editgaransi": {
+                if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
+                if (!text) {
+                    const current = loadGaransiText();
+                    return ctx.reply(`🛡️ <b>Sistem Garansi Saat Ini:</b>\n\n${current}\n\n━━━━━━━━━━━━━━━━━━━━\n<b>Cara edit:</b>\n<code>${config.prefix}editgaransi [teks baru]</code>\n\n<i>Tips: Gunakan HTML tags (bold, italic)\n&lt;b&gt;bold&lt;/b&gt; • &lt;i&gt;italic&lt;/i&gt;</i>`, { parse_mode: "HTML" });
+                }
+                saveGaransiText(text);
+                return ctx.reply(`✅ <b>Sistem Garansi berhasil diubah!</b>\n\n━━━━━━━━━━━━━━━━━━━━\n${text}`, { parse_mode: "HTML" });
             }
 
 
@@ -836,7 +858,7 @@ module.exports = (bot) => {
     });
     bot.action("show_ticket", async (ctx) => { try { await ctx.answerCbQuery(); } catch {} ctx.reply(`Buat tiket: <code>${config.prefix}support [pesan]</code>\nCek tiket: <code>${config.prefix}cektiket</code>`, { parse_mode: "HTML" }); });
     bot.action("owner_menu", async (ctx) => { try { await ctx.answerCbQuery(); } catch {} return ctx.reply(menuTextOwn(), { parse_mode: "HTML" }); });
-    bot.action("snk_menu", async (ctx) => { try { await ctx.answerCbQuery(); } catch {} return ctx.reply(snkText, { parse_mode: "HTML" }); });
+    bot.action("snk_menu", async (ctx) => { try { await ctx.answerCbQuery(); } catch {} return ctx.reply(loadGaransiText(), { parse_mode: "HTML" }); });
 
     bot.action("cancel_order", async (ctx) => {
         try { await ctx.answerCbQuery(); } catch {}
