@@ -46,6 +46,10 @@ module.exports = {
     gopay: ""
   },
 
+  // ===== Garansi =====
+  garansiMarkup: 10000,  // Tambahan harga garansi otomatis (Rp)
+  garansiDays: 7,        // Masa garansi (hari)
+
   // ===== Maintenance Mode =====
   maintenance: false
 };

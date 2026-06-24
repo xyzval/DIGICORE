@@ -504,14 +504,15 @@ module.exports = (bot) => {
 
                 // Cek apakah ada pembelian yang masih dalam masa garansi (7 hari default)
                 const now = Date.now();
-                const GARANSI_DAYS = 7;
+                const GARANSI_DAYS = config.garansiDays || 7;
                 const activeOrders = user.history.filter(h => {
+                    if (h.hasGaransi === false) return false; // Tanpa garansi tidak bisa claim
                     const orderTime = new Date(h.timestamp).getTime();
                     const expiry = orderTime + (GARANSI_DAYS * 24 * 60 * 60 * 1000);
                     return now <= expiry;
                 });
 
-                if (activeOrders.length === 0) return ctx.reply("❌ Tidak ada garansi aktif.\n\nMasa garansi: 7 hari sejak pembelian.");
+                if (activeOrders.length === 0) return ctx.reply("❌ Tidak ada garansi aktif.\n\nKemungkinan:\n- Anda membeli paket Tanpa Garansi\n- Masa garansi sudah habis (7 hari)");
 
                 // Cek apakah sudah pernah claim untuk order terakhir
                 const claims = loadClaims();
@@ -739,20 +740,33 @@ module.exports = (bot) => {
             // ===== ADD STOCK VPS =====
             case "addstockvps": {
                 if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
-                if (!text.includes("|")) return ctx.reply(`Format: ${config.prefix}addstockvps kategori|keterangan|data akun|harga\n\nContoh: ${config.prefix}addstockvps 2vCPU 8GB RAM 550SSD|Ubuntu 24.04 - SG|IP: 1.2.3.4:22\\nUser: root\\nPassword: xxx|35000`);
+                if (!text.includes("|")) return ctx.reply(`Format:\n<code>${config.prefix}addstockvps kategori|keterangan|data akun|harga</code>\n<code>${config.prefix}addstockvps kategori|keterangan|data akun|harga garansi|harga no garansi</code>\n\nContoh 1 harga (markup otomatis +Rp${toRupiah(config.garansiMarkup || 10000)}):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|IP: 1.2.3.4\\nUser: root\\nPass: xxx|25000</code>\n\nContoh 2 harga (manual):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|IP: 1.2.3.4\\nUser: root\\nPass: xxx|35000|25000</code>`, { parse_mode: "HTML" });
                 const parts = text.split("|").map(v => v.trim());
-                if (parts.length < 4) return ctx.reply("Format tidak valid!");
-                const [category, description, accountData, priceStr] = parts;
-                const price = parseInt(priceStr);
-                if (!category || !description || !accountData || isNaN(price)) return ctx.reply("Data tidak valid!");
+                if (parts.length < 4) return ctx.reply("Format tidak valid! Minimal: kategori|keterangan|data akun|harga");
+                const category = parts[0];
+                const description = parts[1];
+                const accountData = parts[2];
+                let priceGaransi, priceNoGaransi;
+
+                if (parts.length >= 5 && !isNaN(parseInt(parts[3])) && !isNaN(parseInt(parts[4]))) {
+                    // Manual 2 harga
+                    priceGaransi = parseInt(parts[3]);
+                    priceNoGaransi = parseInt(parts[4]);
+                } else {
+                    // 1 harga → auto markup
+                    priceNoGaransi = parseInt(parts[3]);
+                    priceGaransi = priceNoGaransi + (config.garansiMarkup || 10000);
+                }
+
+                if (!category || !description || !accountData || isNaN(priceNoGaransi)) return ctx.reply("Data tidak valid!");
                 const vpsData = loadVps();
                 if (!vpsData[category]) vpsData[category] = [];
-                let existing = vpsData[category].find(i => i.description.toLowerCase() === description.toLowerCase() && i.price === price);
+                let existing = vpsData[category].find(i => i.description.toLowerCase() === description.toLowerCase() && i.priceNoGaransi === priceNoGaransi);
                 if (existing) { existing.accounts.push(accountData); existing.stock = existing.accounts.length; }
-                else { vpsData[category].push({ description, price, stock: 1, accounts: [accountData], added_date: new Date().toISOString() }); }
+                else { vpsData[category].push({ description, price: priceGaransi, priceGaransi, priceNoGaransi, stock: 1, accounts: [accountData], added_date: new Date().toISOString() }); }
                 saveVps(vpsData);
                 const totalInCat = vpsData[category].reduce((s, i) => s + i.accounts.length, 0);
-                return ctx.reply(`✅ Stock VPS Berhasil ditambahkan!\n\n📁 Kategori: ${category}\n📝 Keterangan: ${description}\n💰 Harga: Rp${toRupiah(price)}\n📦 Total VPS kategori ${category}: ${totalInCat}`, { parse_mode: "Markdown" });
+                return ctx.reply(`✅ <b>Stock VPS Berhasil ditambahkan!</b>\n\n📁 Kategori: ${escapeHtml(category)}\n📝 Keterangan: ${escapeHtml(description)}\n🛡️ Harga Garansi: Rp${toRupiah(priceGaransi)}\n⚡ Harga No Garansi: Rp${toRupiah(priceNoGaransi)}\n📦 Total stok kategori: ${totalInCat}`, { parse_mode: "HTML" });
             }
 
             // ===== DEL STOCK VPS =====
@@ -880,15 +894,14 @@ module.exports = (bot) => {
         const vpsData = loadVps();
         const items = vpsData[category];
         if (!items || items.length === 0) return ctx.reply("❌ Stok kosong.");
-        const btns = items.map((item, i) => [{ text: `${item.description} • Rp${toRupiah(item.price)} • stok ${item.accounts.length}`, callback_data: `vps_buy_item|${category}|${i}` }]);
+        const btns = items.map((item, i) => [{ text: `${item.description} • stok ${item.accounts.length}`, callback_data: `vps_buy_item|${category}|${i}` }]);
         btns.push([{ text: "↩️ Kembali", callback_data: "buy_vps" }]);
         return ctx.editMessageText(`◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — ${escapeHtml(category)}\n━━━━━━━━━━━━━━━━━━━━\n\nPilih server:`, { parse_mode: "HTML", reply_markup: { inline_keyboard: btns } });
     });
 
-    // VPS buy item
+    // VPS buy item - show warranty options
     bot.action(/vps_buy_item\|(.+)/, async (ctx) => {
         try { await ctx.answerCbQuery(); } catch {}
-        await ctx.deleteMessage();
         const [category, indexStr] = ctx.match[1].split("|");
         const index = parseInt(indexStr);
         const vpsData = loadVps();
@@ -897,10 +910,37 @@ module.exports = (bot) => {
         const item = items[index];
         if (!item.accounts || item.accounts.length === 0) return ctx.reply("❌ Stok habis!");
 
+        const priceGaransi = item.priceGaransi || item.price;
+        const priceNoGaransi = item.priceNoGaransi || item.price;
+
+        const btns = [
+            [{ text: `🛡️ Garansi ${config.garansiDays || 7} Hari • Rp${toRupiah(priceGaransi)}`, callback_data: `vps_pay|${category}|${index}|garansi` }],
+            [{ text: `⚡ Tanpa Garansi • Rp${toRupiah(priceNoGaransi)}`, callback_data: `vps_pay|${category}|${index}|nogaransi` }],
+            [{ text: "↩️ Kembali", callback_data: `vps_category_buy|${category}` }]
+        ];
+
+        return ctx.editMessageText(`◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄\n━━━━━━━━━━━━━━━━━━━━\n\n📦 ${escapeHtml(item.description)}\n\nPilih paket:`, { parse_mode: "HTML", reply_markup: { inline_keyboard: btns } });
+    });
+
+    // VPS pay - process payment after warranty choice
+    bot.action(/vps_pay\|(.+)/, async (ctx) => {
+        try { await ctx.answerCbQuery(); } catch {}
+        await ctx.deleteMessage();
+        const [category, indexStr, warrantyType] = ctx.match[1].split("|");
+        const index = parseInt(indexStr);
+        const vpsData = loadVps();
+        const items = vpsData[category];
+        if (!items || !items[index]) return ctx.reply("❌ Item tidak ditemukan!");
+        const item = items[index];
+        if (!item.accounts || item.accounts.length === 0) return ctx.reply("❌ Stok habis!");
+
+        const hasGaransi = warrantyType === "garansi";
+        const basePrice = hasGaransi ? (item.priceGaransi || item.price) : (item.priceNoGaransi || item.price);
         const userId = ctx.from.id;
         const fee = generateRandomFee();
-        const price = item.price + fee;
+        const price = basePrice + fee;
         const name = `VPS ${category} (${item.description})`;
+        const paketLabel = hasGaransi ? `🛡️ Garansi ${config.garansiDays || 7} Hari` : "⚡ Tanpa Garansi";
         const paymentType = config.paymentGateway;
 
         let pay;
@@ -911,12 +951,12 @@ module.exports = (bot) => {
             return ctx.reply(`❌ Gagal membuat pembayaran: ${err.message}`);
         }
 
-        orders[userId] = { type: "vps_stock", category, itemIndex: index, name, description: item.description, amount: price, fee, orderId: pay.orderId || null, transactionId: pay.transactionId || null, paymentType, chatId: ctx.chat.id, expireAt: Date.now() + 6 * 60 * 1000 };
+        orders[userId] = { type: "vps_stock", category, itemIndex: index, name, description: item.description, amount: price, fee, orderId: pay.orderId || null, transactionId: pay.transactionId || null, paymentType, chatId: ctx.chat.id, expireAt: Date.now() + 6 * 60 * 1000, hasGaransi, paketLabel };
 
         let qrMsg;
         try {
             const photo = paymentType === "pakasir" ? { source: pay.qris } : pay.qris;
-            qrMsg = await ctx.replyWithPhoto(photo, { caption: `📦 Produk: ${name}\n💰 Harga: Rp${toRupiah(price)} (Fee Rp${fee})\n⏳ Expired QRIS: 6 Menit\n\nScan QRIS untuk pembayaran.`, parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: "cancel_order" }]] } });
+            qrMsg = await ctx.replyWithPhoto(photo, { caption: `📦 Produk: ${name}\n${paketLabel}\n💰 Harga: Rp${toRupiah(price)} (Fee Rp${fee})\n⏳ Expired QRIS: 6 Menit\n\nScan QRIS untuk pembayaran.`, parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: "cancel_order" }]] } });
         } catch (err) {
             console.error("[SEND QR ERROR]", err.message);
             delete orders[userId];
@@ -1015,7 +1055,7 @@ module.exports = (bot) => {
             if (!o) return;
 
             // Update history
-            updateUserHistory(userId, { product: o.name, amount: o.amount, type: o.type });
+            updateUserHistory(userId, { product: o.name, amount: o.amount, type: o.type, hasGaransi: o.hasGaransi || false });
             const users = loadUsers();
             const uIdx = users.findIndex(u => u.id === userId);
             if (uIdx !== -1) { users[uIdx].total_spent = (users[uIdx].total_spent || 0) + o.amount; saveUsers(users); }
@@ -1074,7 +1114,11 @@ module.exports = (bot) => {
                     const getVal = (label) => { const line = String(sentVps).split("\n").find(v => v.toLowerCase().startsWith(label.toLowerCase() + ":")); return line ? line.split(":").slice(1).join(":").trim() : "-"; };
                     const ip = getVal("IP"); const port = getVal("PORT"); const user = getVal("USER"); const password = getVal("PASSWORD");
 
-                    const vpsText = `<blockquote>◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫 𝐂𝐨𝐧𝐟𝐢𝐫𝐦𝐞𝐝\n\n┏━━━━━━━━━━━━━━━━━━━┓\n┃  ✅ PEMBAYARAN SUKSES\n┗━━━━━━━━━━━━━━━━━━━┛\n\n⟢ Produk  : ${escapeHtml(o.name)}\n⟢ Harga   : Rp${toRupiah(o.amount)}\n\n━━━ 𝐀𝐤𝐬𝐞𝐬 𝐒𝐞𝐫𝐯𝐞𝐫 ━━━\n\n🌐 IP       : ${ip}\n🔌 Port     : ${port}\n👤 User     : ${user}\n🔑 Pass     : ${password}\n\n━━━ 𝐈𝐧𝐟𝐨𝐫𝐦𝐚𝐬𝐢 ━━━\n\n📅 Tanggal    : ${new Date().toLocaleDateString("id-ID")}\n🛡️ Garansi    : 7 Hari\n⚠️ Claim      : /claimgaransi\n\nTerima kasih telah mempercayai DIGICORE 🙏</blockquote>`;
+                    const garansiInfo = o.hasGaransi
+                        ? `\n🛡️ Paket     : Garansi ${config.garansiDays || 7} Hari\n\n━━━ 𝐈𝐧𝐟𝐨𝐫𝐦𝐚𝐬𝐢 ━━━\n\n📅 Tanggal    : ${new Date().toLocaleDateString("id-ID")}\n🛡️ Garansi    : ${config.garansiDays || 7} Hari\n⚠️ Claim      : /claimgaransi`
+                        : `\n⚡ Paket     : Tanpa Garansi\n\n━━━ 𝐈𝐧𝐟𝐨𝐫𝐦𝐚𝐬𝐢 ━━━\n\n📅 Tanggal    : ${new Date().toLocaleDateString("id-ID")}\n⚡ Garansi    : Tidak ada`;
+
+                    const vpsText = `<blockquote>◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫 𝐂𝐨𝐧𝐟𝐢𝐫𝐦𝐞𝐝\n\n┏━━━━━━━━━━━━━━━━━━━┓\n┃  ✅ PEMBAYARAN SUKSES\n┗━━━━━━━━━━━━━━━━━━━┛\n\n⟢ Produk  : ${escapeHtml(o.name)}\n⟢ Harga   : Rp${toRupiah(o.amount)}${garansiInfo}\n\n━━━ 𝐀𝐤𝐬𝐞𝐬 𝐒𝐞𝐫𝐯𝐞𝐫 ━━━\n\n🌐 IP       : ${ip}\n🔌 Port     : ${port}\n👤 User     : ${user}\n🔑 Pass     : ${password}\n\nTerima kasih telah mempercayai DIGICORE 🙏</blockquote>`;
                     try { await ctx.telegram.sendMessage(o.chatId, vpsText, { parse_mode: "HTML" }); } catch (e) {
                         await ctx.telegram.sendMessage(o.chatId, `✅ VPS/RDP BERHASIL\n\nData:\n${sentVps}\n\nTerima kasih!`);
                     }
