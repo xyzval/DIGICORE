@@ -777,31 +777,32 @@ module.exports = (bot) => {
             // ===== ADD STOCK VPS =====
             case "addstockvps": {
                 if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
-                if (!text.includes("|")) return ctx.reply(`Format:\n<code>${config.prefix}addstockvps kategori|keterangan|IP|PORT|USER|PASSWORD|harga</code>\n\nContoh 1 harga (harga premium, dasar otomatis -Rp${toRupiah(config.garansiMarkup || 10000)}):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|1.2.3.4|22022|root|abc123|35000</code>\n\nContoh 2 harga (manual):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|1.2.3.4|22022|root|abc123|35000|25000</code>`, { parse_mode: "HTML" });
+                if (!text.includes("|")) return ctx.reply(`Format:\n<code>${config.prefix}addstockvps kategori|keterangan|IP|PORT|USER|PASSWORD|SSD|harga</code>\n\nContoh 1 harga (harga premium, dasar otomatis -Rp${toRupiah(config.garansiMarkup || 10000)}):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|1.2.3.4|22022|root|abc123|50GiB SSDNVMe|35000</code>\n\nContoh 2 harga (manual):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM|Ubuntu 24.04 - SG|1.2.3.4|22022|root|abc123|50GiB SSDNVMe|35000|25000</code>`, { parse_mode: "HTML" });
                 const parts = text.split("|").map(v => v.trim());
-                if (parts.length < 7) return ctx.reply("Format tidak valid! Minimal: kategori|keterangan|IP|PORT|USER|PASSWORD|harga");
+                if (parts.length < 8) return ctx.reply("Format tidak valid! Minimal: kategori|keterangan|IP|PORT|USER|PASSWORD|SSD|harga");
                 const category = parts[0];
                 const description = parts[1];
                 const ip = parts[2];
                 const port = parts[3];
                 const user = parts[4];
                 const password = parts[5];
-                const accountData = `IP: ${ip}\nPORT: ${port}\nUSER: ${user}\nPASSWORD: ${password}`;
+                const storage = parts[6];
+                const accountData = `IP: ${ip}\nPORT: ${port}\nUSER: ${user}\nPASSWORD: ${password}\nSSD: ${storage}`;
 
                 let priceGaransi, priceNoGaransi;
 
-                if (parts.length >= 8 && !isNaN(parseInt(parts[6])) && !isNaN(parseInt(parts[7]))) {
+                if (parts.length >= 9 && !isNaN(parseInt(parts[7])) && !isNaN(parseInt(parts[8]))) {
                     // Manual 2 harga
-                    priceGaransi = parseInt(parts[6]);
-                    priceNoGaransi = parseInt(parts[7]);
+                    priceGaransi = parseInt(parts[7]);
+                    priceNoGaransi = parseInt(parts[8]);
                 } else {
                     // 1 harga = harga premium, dasar otomatis dikurangi markup
-                    priceGaransi = parseInt(parts[6]);
+                    priceGaransi = parseInt(parts[7]);
                     priceNoGaransi = priceGaransi - (config.garansiMarkup || 10000);
                     if (priceNoGaransi < 0) priceNoGaransi = priceGaransi;
                 }
 
-                if (!category || !description || !ip || !port || !user || !password || isNaN(priceNoGaransi)) return ctx.reply("Data tidak valid!");
+                if (!category || !description || !ip || !port || !user || !password || !storage || isNaN(priceNoGaransi)) return ctx.reply("Data tidak valid!");
                 const vpsData = loadVps();
                 if (!vpsData[category]) vpsData[category] = [];
                 let existing = vpsData[category].find(i => i.description.toLowerCase() === description.toLowerCase() && i.priceNoGaransi === priceNoGaransi);
@@ -809,7 +810,7 @@ module.exports = (bot) => {
                 else { vpsData[category].push({ description, price: priceGaransi, priceGaransi, priceNoGaransi, stock: 1, accounts: [accountData], added_date: new Date().toISOString() }); }
                 saveVps(vpsData);
                 const totalInCat = vpsData[category].reduce((s, i) => s + i.accounts.length, 0);
-                return ctx.reply(`✅ <b>Stock VPS Berhasil ditambahkan!</b>\n\n📁 Kategori: ${escapeHtml(category)}\n📝 Keterangan: ${escapeHtml(description)}\n🌐 IP: ${escapeHtml(ip)}\n🔌 Port: ${escapeHtml(port)}\n👤 User: ${escapeHtml(user)}\n🔑 Pass: ${escapeHtml(password)}\n🛡️ Harga Garansi: Rp${toRupiah(priceGaransi)}\n⚡ Harga Dasar: Rp${toRupiah(priceNoGaransi)}\n📦 Total stok kategori: ${totalInCat}`, { parse_mode: "HTML" });
+                return ctx.reply(`✅ <b>Stock VPS Berhasil ditambahkan!</b>\n\n📁 Kategori: ${escapeHtml(category)}\n📝 Keterangan: ${escapeHtml(description)}\n🌐 IP: ${escapeHtml(ip)}\n🔌 Port: ${escapeHtml(port)}\n👤 User: ${escapeHtml(user)}\n🔑 Pass: ${escapeHtml(password)}\n💾 SSD: ${escapeHtml(storage)}\n🛡️ Harga Garansi: Rp${toRupiah(priceGaransi)}\n⚡ Harga Dasar: Rp${toRupiah(priceNoGaransi)}\n📦 Total stok kategori: ${totalInCat}`, { parse_mode: "HTML" });
             }
 
             // ===== DEL STOCK VPS =====
@@ -1162,12 +1163,12 @@ module.exports = (bot) => {
 
                     // Parse VPS data
                     const getVal = (label) => { const line = String(sentVps).split("\n").find(v => v.toLowerCase().startsWith(label.toLowerCase() + ":")); return line ? line.split(":").slice(1).join(":").trim() : "-"; };
-                    const ip = getVal("IP"); const port = getVal("PORT"); const user = getVal("USER"); const password = getVal("PASSWORD");
+                    const ip = getVal("IP"); const port = getVal("PORT"); const user = getVal("USER"); const password = getVal("PASSWORD"); const ssd = getVal("SSD");
 
                     const garansiDaysOrder = o.garansiDays || (o.hasGaransi ? (config.garansiDays || 30) : (config.garansiBaseDays || 12));
                     const garansiInfo = `\n🛡️ Paket     : Garansi ${garansiDaysOrder} Hari\n\n━━━ 𝐈𝐧𝐟𝐨𝐫𝐦𝐚𝐬𝐢 ━━━\n\n📅 Tanggal    : ${new Date().toLocaleDateString("id-ID")}\n🛡️ Garansi    : ${garansiDaysOrder} Hari\n⚠️ Claim      : /claimgaransi`;
 
-                    const vpsText = `<blockquote>◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫 𝐂𝐨𝐧𝐟𝐢𝐫𝐦𝐞𝐝\n\n┏━━━━━━━━━━━━━━━━━━━┓\n┃  ✅ PEMBAYARAN SUKSES\n┗━━━━━━━━━━━━━━━━━━━┛\n\n⟢ Produk  : ${escapeHtml(o.name)}\n⟢ Harga   : Rp${toRupiah(o.amount)}${garansiInfo}\n\n━━━ 𝐀𝐤𝐬𝐞𝐬 𝐒𝐞𝐫𝐯𝐞𝐫 ━━━\n\n🌐 IP       : ${ip}\n🔌 Port     : ${port}\n👤 User     : ${user}\n🔑 Pass     : ${password}\n\nTerima kasih telah mempercayai DIGICORE 🙏</blockquote>`;
+                    const vpsText = `<blockquote>◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫 𝐂𝐨𝐧𝐟𝐢𝐫𝐦𝐞𝐝\n\n┏━━━━━━━━━━━━━━━━━━━┓\n┃  ✅ PEMBAYARAN SUKSES\n┗━━━━━━━━━━━━━━━━━━━┛\n\n⟢ Produk  : ${escapeHtml(o.name)}\n⟢ Harga   : Rp${toRupiah(o.amount)}${garansiInfo}\n\n━━━ 𝐀𝐤𝐬𝐞𝐬 𝐒𝐞𝐫𝐯𝐞𝐫 ━━━\n\n🌐 IP       : ${ip}\n🔌 Port     : ${port}\n👤 User     : ${user}\n🔑 Pass     : ${password}\n💾 Storage  : ${ssd}\n\nTerima kasih telah mempercayai DIGICORE 🙏</blockquote>`;
                     try { await ctx.telegram.sendMessage(o.chatId, vpsText, { parse_mode: "HTML" }); } catch (e) {
                         await ctx.telegram.sendMessage(o.chatId, `✅ VPS/RDP BERHASIL\n\nData:\n${sentVps}\n\nTerima kasih!`);
                     }
