@@ -1007,7 +1007,7 @@ module.exports = (bot) => {
         let qrMsg;
         try {
             const photo = paymentType === "pakasir" ? { source: pay.qris } : pay.qris;
-            qrMsg = await ctx.replyWithPhoto(photo, { caption: `📦 Produk: ${name}\n${paketLabel}\n💰 Harga: Rp${toRupiah(price)} (Fee Rp${fee})\n⏳ Expired QRIS: 6 Menit\n\nScan QRIS untuk pembayaran.`, parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: "cancel_order" }]] } });
+            qrMsg = await ctx.replyWithPhoto(photo, { caption: `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐏𝐚𝐲𝐦𝐞𝐧𝐭\n━━━━━━━━━━━━━━━━━━━━\n\n⟢ Produk   : ${name}\n⟢ Paket    : ${paketLabel}\n⟢ Total    : Rp${toRupiah(price)}\n\n━━━━━━━━━━━━━━━━━━━━\n⏳ Expired: 6 Menit\n📲 Scan QRIS untuk pembayaran`, parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan", callback_data: "cancel_order" }]] } });
         } catch (err) {
             console.error("[SEND QR ERROR]", err.message);
             delete orders[userId];
