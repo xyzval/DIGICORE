@@ -897,7 +897,14 @@ module.exports = (bot) => {
             const totalStok = vpsData[cat].reduce((s, i) => s + (i.accounts ? i.accounts.length : 0), 0);
             return [{ text: `${cat} • ${totalStok} tersedia`, callback_data: `vps_category_buy|${cat}` }];
         });
+        btns.push([{ text: "↩️ Kembali", callback_data: "back_to_menu" }]);
         return ctx.reply(`◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫\n━━━━━━━━━━━━━━━━━━━━\n\nPilih kategori server:`, { parse_mode: "HTML", reply_markup: { inline_keyboard: btns } });
+    });
+
+    bot.action("back_to_menu", async (ctx) => {
+        try { await ctx.answerCbQuery(); } catch {}
+        await ctx.deleteMessage();
+        return ctx.reply(menuTextBot(ctx), { parse_mode: "HTML", reply_markup: mainKeyboard(ctx) });
     });
 
     bot.action("show_review", async (ctx) => {
