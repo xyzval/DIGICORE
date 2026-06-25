@@ -100,15 +100,6 @@ async function performBackup(bot) {
 function startAutoBackup(bot) {
   console.log(`[AutoBackup] Auto backup aktif — interval: setiap 6 jam`);
 
-  // Jalankan backup pertama 10 detik setelah bot start (opsional, bisa dihapus)
-  setTimeout(async () => {
-    try {
-      await performBackup(bot);
-    } catch (err) {
-      console.error("[AutoBackup] Backup awal gagal:", err.message);
-    }
-  }, 10000);
-
   // Jalankan backup setiap 6 jam
   setInterval(async () => {
     try {
