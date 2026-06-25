@@ -29,7 +29,7 @@ async function autoCloseTickets(bot) {
         changed = true;
         try {
           await bot.telegram.sendMessage(ticket.userId,
-            `🔴 <b>Tiket #${ticket.id} Ditutup Otomatis</b>\n\nTidak ada aktivitas selama 48 jam.\nBuat tiket baru jika masih ada masalah:\n<code>${config.prefix}ticket [pesan]</code>`,
+            `🔴 <b>Tiket #${ticket.id} Ditutup Otomatis</b>\n\nTidak ada aktivitas selama 48 jam.\nBuat tiket baru jika masih ada masalah:\n<code>${config.prefix}support [pesan]</code>`,
             { parse_mode: "HTML" });
         } catch (e) {}
       }
@@ -43,12 +43,31 @@ async function autoCloseTickets(bot) {
 
   require("./bot")(bot);
 
-  bot.launch();
-  await bot.telegram.setMyCommands([
-    { command: "menu", description: "Tampilkan Menu Utama" },
-    { command: "buycloud", description: "Beli VPS / RDP" },
-    { command: "ticket", description: "Buat Tiket Support" }
-  ]);
+  // ===== Force update bot commands =====
+  try {
+    await bot.telegram.deleteMyCommands();
+    await bot.telegram.setMyCommands([
+      { command: "menu", description: "Tampilkan Menu Utama" },
+      { command: "buycloud", description: "Beli VPS / RDP" },
+      { command: "support", description: "Buat Tiket Support" },
+      { command: "claimgaransi", description: "Claim Garansi VPS" }
+    ]);
+    console.log("• Bot commands updated");
+  } catch (err) {
+    console.warn("⚠️  Gagal update commands:", err.message);
+  }
+
+  // ===== Launch bot =====
+  bot.launch({ dropPendingUpdates: true })
+    .catch((err) => {
+      console.error("❌ Bot launch error:", err.message);
+      if (err.message && err.message.includes("409")) {
+        console.error("   Ada instance bot lain yang masih jalan!");
+        console.error("   Jalankan: pkill -f 'node index.js' lalu coba lagi");
+      }
+      process.exit(1);
+    });
+
   console.log("• DIGICORE Bot Connected");
 
   startAutoBackup(bot);
