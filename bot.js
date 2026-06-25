@@ -681,10 +681,11 @@ module.exports = (bot) => {
         const vpsData = loadVps();
         if (!vpsData[category] || !vpsData[category][index]) return ctx.editMessageText("❌ Tidak ditemukan.");
         const item = vpsData[category][index];
-        item.accounts.shift(); item.stock = item.accounts.length;
+        const deletedAccount = item.accounts.shift();
+        item.stock = item.accounts.length;
         if (item.accounts.length === 0) { vpsData[category].splice(index, 1); if (vpsData[category].length === 0) delete vpsData[category]; }
         saveVps(vpsData);
-        return ctx.editMessageText(`✅ 1 akun dihapus dari ${escapeHtml(category)} - ${escapeHtml(item.description)}`, { parse_mode: "HTML" });
+        return ctx.editMessageText(`✅ 1 akun dihapus dari <b>${escapeHtml(category)}</b> - ${escapeHtml(item.description)}\n\n📋 <b>Data yang dihapus:</b>\n<code>${escapeHtml(deletedAccount)}</code>\n\n📦 Sisa stok: ${item.accounts.length}`, { parse_mode: "HTML" });
     });
 
     bot.action(/delvps_all\|(.+)/, async (ctx) => {
