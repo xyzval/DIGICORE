@@ -464,7 +464,7 @@ module.exports = (bot) => {
                         `🆔 Order: <code>${order2.orderId}</code>\n` +
                         `📦 Produk: ${escapeHtml(order2.name)}\n` +
                         `💬 Alasan: ${escapeHtml(rejectReason)}\n\n` +
-                        `Hubungi owner jika ada pertanyaan: @${config.ownerUsername}`,
+                        `Hubungi owner jika ada pertanyaan melalui <code>${config.prefix}support</code>`,
                         { parse_mode: "HTML" }
                     );
                 } catch (e) {}
@@ -1541,7 +1541,7 @@ module.exports = (bot) => {
                 `🆔 Order: <code>${orderId}</code>\n` +
                 `📦 Produk: ${escapeHtml(order.name)}\n` +
                 `💬 Alasan: Bukti pembayaran tidak valid\n\n` +
-                `Hubungi owner jika ada pertanyaan: @${config.ownerUsername}`,
+                `Hubungi owner jika ada pertanyaan melalui <code>${config.prefix}support</code>`,
                 { parse_mode: "HTML" }
             );
         } catch (e) {}
