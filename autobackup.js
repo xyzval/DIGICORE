@@ -27,13 +27,15 @@ async function performBackup(bot) {
 
   const exclude = [
     "node_modules", "package-lock.json", "yarn.lock",
-    ".npm", ".cache", ".git"
+    ".npm", ".cache", ".git", ".env",
+    "install.sh"
   ];
 
   const filesToZip = fs.readdirSync(__dirname).filter((f) =>
     !exclude.includes(f) &&
     !f.startsWith(".") &&
     !f.endsWith(".zip") &&
+    !f.endsWith(".log") &&
     f !== ""
   );
 
@@ -87,7 +89,10 @@ async function performBackup(bot) {
       const fullPath = path.join(__dirname, file);
       const stat = fs.statSync(fullPath);
       if (stat.isDirectory()) {
-        archive.directory(fullPath, file);
+        // Skip node_modules di dalam subfolder juga
+        archive.directory(fullPath, file, (entry) => {
+          return !entry.name.includes("node_modules");
+        });
       } else {
         archive.file(fullPath, { name: file });
       }
