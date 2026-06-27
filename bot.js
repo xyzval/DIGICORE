@@ -1305,9 +1305,14 @@ module.exports = (bot) => {
             `━━━━━━━━━━━━━━━━━━━━\n` +
             `📌 Setelah transfer:\n` +
             `• Screenshot bukti bayar\n` +
-            `• Kirim ke owner: @${config.ownerUsername}\n` +
-            `• Sertakan Order ID: ${manualOrderId}\n\n` +
+            `• Klik tombol "📸 Kirim Bukti Bayar"\n` +
+            `• Order ID: ${manualOrderId}\n\n` +
             `⏳ Konfirmasi maks 1x24 jam`;
+
+        const manualButtons = [
+            [{ text: "📸 Kirim Bukti Bayar", callback_data: `send_proof|${manualOrderId}` }],
+            [{ text: "❌ Batalkan Order", callback_data: `cancel_manual|${manualOrderId}` }]
+        ];
 
         // Kirim foto QRIS statis jika ada
         const qrisPath = config.payment.qris;
@@ -1326,13 +1331,13 @@ module.exports = (bot) => {
                     await ctx.replyWithPhoto(photo, {
                         caption: captionText,
                         parse_mode: "Markdown",
-                        reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: `cancel_manual|${manualOrderId}` }]] }
+                        reply_markup: { inline_keyboard: manualButtons }
                     });
                 } else {
-                    await ctx.reply(captionText + `\n\n📲 QRIS: ${config.payment.qris}`, { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: `cancel_manual|${manualOrderId}` }]] } });
+                    await ctx.reply(captionText + `\n\n📲 QRIS: ${config.payment.qris}`, { parse_mode: "Markdown", reply_markup: { inline_keyboard: manualButtons } });
                 }
             } catch (e) {
-                await ctx.reply(captionText, { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: `cancel_manual|${manualOrderId}` }]] } });
+                await ctx.reply(captionText, { parse_mode: "Markdown", reply_markup: { inline_keyboard: manualButtons } });
             }
         } else {
             // Tidak ada QRIS, tampilkan info transfer lain
@@ -1341,7 +1346,7 @@ module.exports = (bot) => {
             if (config.payment.ovo) payInfo += `• OVO: ${config.payment.ovo}\n`;
             if (config.payment.gopay) payInfo += `• GoPay: ${config.payment.gopay}\n`;
             if (!payInfo) payInfo = `• Hubungi owner: @${config.ownerUsername}\n`;
-            await ctx.reply(captionText + `\n\n📲 Transfer ke:\n${payInfo}`, { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: `cancel_manual|${manualOrderId}` }]] } });
+            await ctx.reply(captionText + `\n\n📲 Transfer ke:\n${payInfo}`, { parse_mode: "Markdown", reply_markup: { inline_keyboard: manualButtons } });
         }
 
         // Notif ke owner
@@ -1375,6 +1380,73 @@ module.exports = (bot) => {
         }
         try { await ctx.deleteMessage(); } catch {}
         return ctx.reply("❌ Order manual dibatalkan.");
+    });
+
+    // Send payment proof - user clicks button
+    const waitingProof = {}; // { userId: orderId }
+
+    bot.action(/send_proof\|(.+)/, async (ctx) => {
+        try { await ctx.answerCbQuery(); } catch {}
+        const orderId = ctx.match[1];
+        const userId = ctx.from.id;
+        const manualOrdersFile = path.join(__dirname, "database/manual_orders.json");
+        let manualOrders = [];
+        try { manualOrders = JSON.parse(fs.readFileSync(manualOrdersFile)); } catch {}
+        const order = manualOrders.find(o => o.orderId === orderId && o.status === "pending");
+        if (!order) return ctx.reply("❌ Order tidak ditemukan atau sudah diproses.");
+
+        waitingProof[userId] = orderId;
+        return ctx.reply(
+            `📸 <b>Kirim Bukti Pembayaran</b>\n\n` +
+            `Order ID: <code>${orderId}</code>\n` +
+            `Total: <b>Rp${toRupiah(order.amount)}</b>\n\n` +
+            `Silakan kirim <b>foto/screenshot</b> bukti transfer sekarang.\n\n` +
+            `⏳ Menunggu foto...`,
+            { parse_mode: "HTML" }
+        );
+    });
+
+    // Listen for photo proof from user
+    bot.on("photo", async (ctx) => {
+        const userId = ctx.from.id;
+        if (!waitingProof[userId]) return; // bukan menunggu bukti
+
+        const orderId = waitingProof[userId];
+        delete waitingProof[userId];
+
+        const manualOrdersFile = path.join(__dirname, "database/manual_orders.json");
+        let manualOrders = [];
+        try { manualOrders = JSON.parse(fs.readFileSync(manualOrdersFile)); } catch {}
+        const order = manualOrders.find(o => o.orderId === orderId && o.status === "pending");
+        if (!order) return ctx.reply("❌ Order tidak ditemukan atau sudah diproses.");
+
+        // Konfirmasi ke user
+        await ctx.reply(
+            `✅ <b>Bukti pembayaran diterima!</b>\n\n` +
+            `🆔 Order: <code>${orderId}</code>\n` +
+            `⏳ Menunggu konfirmasi dari admin.\n\n` +
+            `Kami akan kirim notifikasi setelah dikonfirmasi.`,
+            { parse_mode: "HTML" }
+        );
+
+        // Forward bukti + info ke owner
+        const photoId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+        try {
+            await ctx.telegram.sendPhoto(config.ownerId, photoId, {
+                caption:
+                    `📸 <b>Bukti Bayar Diterima!</b>\n\n` +
+                    `🆔 Order: <code>${orderId}</code>\n` +
+                    `👤 User: @${ctx.from.username || ctx.from.first_name} (${userId})\n` +
+                    `📦 Produk: ${escapeHtml(order.name)}\n` +
+                    `🛡️ Paket: ${order.paketLabel}\n` +
+                    `💰 Total: <b>Rp${toRupiah(order.amount)}</b>\n` +
+                    `📅 Order: ${new Date(order.created_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}\n\n` +
+                    `━━━━━━━━━━━━━━━━━━━━\n` +
+                    `✅ Konfirmasi: <code>${config.prefix}confirm ${orderId}</code>\n` +
+                    `❌ Tolak: <code>${config.prefix}reject ${orderId}</code>`,
+                parse_mode: "HTML"
+            });
+        } catch (e) { console.error("[SEND PROOF TO OWNER]", e.message); }
     });
 
 
