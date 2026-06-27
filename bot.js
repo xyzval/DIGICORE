@@ -731,20 +731,23 @@ module.exports = (bot) => {
 
                 const { exec } = require("child_process");
                 const runCmd = (cmd) => new Promise((resolve) => {
-                    exec(cmd, { cwd: __dirname, timeout: 30000 }, (err, stdout, stderr) => {
+                    exec(cmd, { cwd: __dirname, timeout: 60000 }, (err, stdout, stderr) => {
                         resolve({ error: err, stdout: stdout?.trim() || "", stderr: stderr?.trim() || "" });
                     });
                 });
 
-                // Step 1: Git fetch & reset
-                const fetch = await runCmd("git fetch origin main");
-                if (fetch.error) {
-                    return ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, `❌ <b>Update Gagal!</b>\n\n<code>${escapeHtml(fetch.stderr || fetch.error.message)}</code>`, { parse_mode: "HTML" });
-                }
-
-                const pull = await runCmd("git reset --hard origin/main");
+                // Step 1: Git pull from main
+                const pull = await runCmd("git pull origin main --force");
                 if (pull.error) {
-                    return ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, `❌ <b>Update Gagal!</b>\n\n<code>${escapeHtml(pull.stderr || pull.error.message)}</code>`, { parse_mode: "HTML" });
+                    // Fallback: fetch + reset
+                    const fetch2 = await runCmd("git fetch origin main");
+                    if (fetch2.error) {
+                        return ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, `❌ <b>Update Gagal!</b>\n\n<code>${escapeHtml(fetch2.stderr || fetch2.error.message)}</code>`, { parse_mode: "HTML" });
+                    }
+                    const reset = await runCmd("git reset --hard origin/main");
+                    if (reset.error) {
+                        return ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, `❌ <b>Update Gagal!</b>\n\n<code>${escapeHtml(reset.stderr || reset.error.message)}</code>`, { parse_mode: "HTML" });
+                    }
                 }
 
                 // Step 2: Install dependencies jika ada perubahan
@@ -761,14 +764,10 @@ module.exports = (bot) => {
                 // Step 4: Restart via PM2
                 setTimeout(async () => {
                     try {
-                        const restart = await runCmd("pm2 restart DIGICORE");
-                        if (restart.error) {
-                            // Fallback: restart manual
-                            process.exit(0);
-                        }
-                    } catch (e) {
-                        process.exit(0);
-                    }
+                        await runCmd("pm2 restart DIGICORE");
+                    } catch (e) {}
+                    // Fallback: exit process (PM2 will auto-restart)
+                    process.exit(0);
                 }, 3000);
                 break;
             }
