@@ -1185,7 +1185,13 @@ module.exports = (bot) => {
             pay = await createPayment(paymentType, price, config, { customerName: `@${ctx.from.username || ctx.from.first_name}` });
         } catch (err) {
             console.error("[CREATE PAYMENT ERROR]", err.message);
-            return ctx.reply(`❌ Pembayaran otomatis sedang gangguan.\n\nSilakan gunakan metode <b>Bayar Manual</b> sebagai alternatif.`, { parse_mode: "HTML" });
+            return ctx.reply(`❌ Pembayaran otomatis sedang gangguan.\n\nSilakan gunakan metode <b>Bayar Manual</b> sebagai alternatif.`, {
+                parse_mode: "HTML",
+                reply_markup: { inline_keyboard: [
+                    [{ text: "📲 Bayar Manual", callback_data: `vps_manualpay|${category}|${index}|${warrantyType}` }],
+                    [{ text: "↩️ Kembali ke Menu", callback_data: "back_to_menu" }]
+                ]}
+            });
         }
 
         orders[userId] = { type: "vps_stock", category, itemIndex: index, name, description: item.description, amount: price, fee, orderId: pay.orderId || null, transactionId: pay.transactionId || null, paymentType, chatId: ctx.chat.id, expireAt: Date.now() + 6 * 60 * 1000, hasGaransi, garansiDays: garansiDaysUsed, paketLabel };
