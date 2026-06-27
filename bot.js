@@ -739,19 +739,27 @@ module.exports = (bot) => {
                     });
                 });
 
-                // Step 1: Git pull from main
+                // Step 1: Backup database sebelum update
+                await runCmd("cp -r database database_backup");
+
+                // Step 2: Git pull from main
                 const pull = await runCmd("git pull origin main --force");
                 if (pull.error) {
                     // Fallback: fetch + reset
                     const fetch2 = await runCmd("git fetch origin main");
                     if (fetch2.error) {
+                        await runCmd("rm -rf database_backup");
                         return ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, `❌ <b>Update Gagal!</b>\n\n<code>${escapeHtml(fetch2.stderr || fetch2.error.message)}</code>`, { parse_mode: "HTML" });
                     }
                     const reset = await runCmd("git reset --hard origin/main");
                     if (reset.error) {
+                        await runCmd("rm -rf database_backup");
                         return ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, `❌ <b>Update Gagal!</b>\n\n<code>${escapeHtml(reset.stderr || reset.error.message)}</code>`, { parse_mode: "HTML" });
                     }
                 }
+
+                // Step 3: Restore database dari backup
+                await runCmd("cp -rf database_backup/* database/ && rm -rf database_backup");
 
                 // Step 2: Install dependencies jika ada perubahan
                 await runCmd("npm install --production 2>/dev/null");
