@@ -28,7 +28,7 @@ async function performBackup(bot) {
   const exclude = [
     "node_modules", "package-lock.json", "yarn.lock",
     ".npm", ".cache", ".git", ".env",
-    "install.sh"
+    "install.sh", "DIGICORE"
   ];
 
   const filesToZip = fs.readdirSync(__dirname).filter((f) =>
