@@ -8,12 +8,16 @@
   },
   "author": "DIGICORE",
   "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "dependencies": {
     "archiver": "^7.0.1",
     "axios": "^1.6.8",
+    "chalk": "^4.1.2",
     "moment-timezone": "^0.5.34",
-    "node-fetch": "^3.3.2",
+    "node-fetch": "^2.7.0",
     "qrcode": "*",
-    "telegraf": "*"
+    "telegraf": "^4.16.3"
   }
 }
