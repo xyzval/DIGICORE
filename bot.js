@@ -737,12 +737,12 @@ module.exports = (bot) => {
                 });
 
                 // Step 1: Git fetch & reset
-                const fetch = await runCmd("git fetch origin fix/bug-fixes-error-handling");
+                const fetch = await runCmd("git fetch origin main");
                 if (fetch.error) {
                     return ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, `❌ <b>Update Gagal!</b>\n\n<code>${escapeHtml(fetch.stderr || fetch.error.message)}</code>`, { parse_mode: "HTML" });
                 }
 
-                const pull = await runCmd("git reset --hard origin/fix/bug-fixes-error-handling");
+                const pull = await runCmd("git reset --hard origin/main");
                 if (pull.error) {
                     return ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, `❌ <b>Update Gagal!</b>\n\n<code>${escapeHtml(pull.stderr || pull.error.message)}</code>`, { parse_mode: "HTML" });
                 }
