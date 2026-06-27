@@ -1081,10 +1081,43 @@ module.exports = (bot) => {
         const vpsData = loadVps();
         if (!vpsData[category] || !vpsData[category][index]) return ctx.editMessageText("❌ Tidak ditemukan.");
         const item = vpsData[category][index];
-        item.accounts.shift(); item.stock = item.accounts.length;
+        if (!item.accounts || item.accounts.length === 0) return ctx.editMessageText("❌ Stok kosong.");
+
+        // Tampilkan daftar IP untuk dipilih
+        const btns = item.accounts.map((acc, ai) => {
+            const ipMatch = acc.match(/IP:\s*([^\n]+)/i);
+            const ip = ipMatch ? ipMatch[1].trim() : `Akun #${ai + 1}`;
+            return [{ text: `🗑️ ${ip}`, callback_data: `delvps_acc|${category}|${index}|${ai}` }];
+        });
+        btns.push([{ text: "↩️ Kembali", callback_data: `delvps_cat|${category}` }]);
+        return ctx.editMessageText(
+            `🗑️ <b>Hapus Akun dari:</b>\n${escapeHtml(category)} — ${escapeHtml(item.description)}\n\n` +
+            `Pilih IP yang mau dihapus:`,
+            { parse_mode: "HTML", reply_markup: { inline_keyboard: btns } }
+        );
+    });
+
+    bot.action(/delvps_acc\|(.+)/, async (ctx) => {
+        try { await ctx.answerCbQuery(); } catch {}
+        if (!isOwner(ctx)) return;
+        const parts = ctx.match[1].split("|");
+        const category = parts[0];
+        const index = parseInt(parts[1]);
+        const accIndex = parseInt(parts[2]);
+        const vpsData = loadVps();
+        if (!vpsData[category] || !vpsData[category][index]) return ctx.editMessageText("❌ Tidak ditemukan.");
+        const item = vpsData[category][index];
+        if (!item.accounts[accIndex]) return ctx.editMessageText("❌ Akun tidak ditemukan.");
+
+        const deletedAcc = item.accounts[accIndex];
+        const ipMatch = deletedAcc.match(/IP:\s*([^\n]+)/i);
+        const ip = ipMatch ? ipMatch[1].trim() : "Unknown";
+
+        item.accounts.splice(accIndex, 1);
+        item.stock = item.accounts.length;
         if (item.accounts.length === 0) { vpsData[category].splice(index, 1); if (vpsData[category].length === 0) delete vpsData[category]; }
         saveVps(vpsData);
-        return ctx.editMessageText(`✅ 1 akun dihapus dari ${escapeHtml(category)} - ${escapeHtml(item.description)}`, { parse_mode: "HTML" });
+        return ctx.editMessageText(`✅ Akun berhasil dihapus!\n\n🗑️ IP: <code>${escapeHtml(ip)}</code>\n📁 ${escapeHtml(category)} — ${escapeHtml(item.description)}\n📦 Sisa stok: ${item.accounts.length}`, { parse_mode: "HTML" });
     });
 
     bot.action(/delvps_all\|(.+)/, async (ctx) => {
