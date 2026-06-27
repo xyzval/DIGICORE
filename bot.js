@@ -377,6 +377,114 @@ module.exports = (bot) => {
                 return ctx.reply(`Status: ${getMaintenanceStatus() ? "🔧 ON" : "✅ OFF"}\n\nGunakan:\n<code>${config.prefix}maintenance on</code>\n<code>${config.prefix}maintenance off</code>`, { parse_mode: "HTML" });
             }
 
+            // ===== CONFIRM MANUAL PAYMENT (OWNER) =====
+            case "confirm": {
+                if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
+                if (!text) return ctx.reply(`Format: <code>${config.prefix}confirm [ORDER_ID]</code>`, { parse_mode: "HTML" });
+                const manualOrdersFile = path.join(__dirname, "database/manual_orders.json");
+                let manualOrders = [];
+                try { manualOrders = JSON.parse(fs.readFileSync(manualOrdersFile)); } catch {}
+                const order = manualOrders.find(o => o.orderId === text.trim() && o.status === "pending");
+                if (!order) return ctx.reply("❌ Order tidak ditemukan atau sudah diproses.");
+
+                // Kirim akun VPS ke user
+                const vpsData = loadVps();
+                const items = vpsData[order.category];
+                if (!items || !items[order.itemIndex] || !items[order.itemIndex].accounts || items[order.itemIndex].accounts.length === 0) {
+                    return ctx.reply("❌ Stok sudah habis! Tidak bisa konfirmasi.");
+                }
+                const item = items[order.itemIndex];
+                const account = item.accounts.shift();
+                item.stock = item.accounts.length;
+                if (item.accounts.length === 0) { vpsData[order.category].splice(order.itemIndex, 1); if (vpsData[order.category].length === 0) delete vpsData[order.category]; }
+                saveVps(vpsData);
+
+                // Update order status
+                order.status = "confirmed";
+                order.confirmed_at = new Date().toISOString();
+                fs.writeFileSync(manualOrdersFile, JSON.stringify(manualOrders, null, 2));
+
+                // Update user data
+                const users = loadUsers();
+                const user = users.find(u => u.id === order.userId);
+                if (user) {
+                    user.totalSpent = (user.totalSpent || 0) + order.amount;
+                    user.totalOrders = (user.totalOrders || 0) + 1;
+                    if (!user.orders) user.orders = [];
+                    user.orders.push({ product: order.name, price: order.amount, timestamp: new Date().toISOString(), garansi: order.hasGaransi, garansiDays: order.garansiDays, paymentMethod: "manual" });
+                    saveUsers(users);
+                }
+
+                // Kirim akun ke user
+                const garansiExpiry = new Date(Date.now() + order.garansiDays * 24 * 60 * 60 * 1000).toLocaleDateString("id-ID");
+                try {
+                    await ctx.telegram.sendMessage(order.userId,
+                        `✅ <b>Pembayaran Dikonfirmasi!</b>\n\n` +
+                        `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫 𝐒𝐮𝐜𝐜𝐞𝐬𝐬\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                        `⟢ Produk : ${escapeHtml(order.name)}\n` +
+                        `⟢ Paket  : ${order.paketLabel}\n` +
+                        `⟢ Harga  : Rp${toRupiah(order.amount)}\n\n` +
+                        `━━━━━━━━━━━━━━━━━━━━\n` +
+                        `📋 <b>Detail Akun:</b>\n<code>${account}</code>\n\n` +
+                        `━━━━━━━━━━━━━━━━━━━━\n` +
+                        `🛡️ Garansi berlaku sampai: ${garansiExpiry}\n` +
+                        `📌 Simpan pesan ini baik-baik!`,
+                        { parse_mode: "HTML" }
+                    );
+                } catch (e) { console.error("[CONFIRM SEND]", e.message); }
+
+                return ctx.reply(`✅ Order <code>${order.orderId}</code> berhasil dikonfirmasi!\nAkun sudah dikirim ke user.`, { parse_mode: "HTML" });
+            }
+
+            // ===== REJECT MANUAL PAYMENT (OWNER) =====
+            case "reject": {
+                if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
+                if (!text) return ctx.reply(`Format: <code>${config.prefix}reject [ORDER_ID] [alasan]</code>`, { parse_mode: "HTML" });
+                const parts2 = text.split(" ");
+                const rejectOrderId = parts2[0];
+                const rejectReason = parts2.slice(1).join(" ") || "Pembayaran tidak valid";
+                const manualOrdersFile2 = path.join(__dirname, "database/manual_orders.json");
+                let manualOrders2 = [];
+                try { manualOrders2 = JSON.parse(fs.readFileSync(manualOrdersFile2)); } catch {}
+                const order2 = manualOrders2.find(o => o.orderId === rejectOrderId && o.status === "pending");
+                if (!order2) return ctx.reply("❌ Order tidak ditemukan atau sudah diproses.");
+
+                order2.status = "rejected";
+                order2.rejected_at = new Date().toISOString();
+                order2.reason = rejectReason;
+                fs.writeFileSync(manualOrdersFile2, JSON.stringify(manualOrders2, null, 2));
+
+                // Notif ke user
+                try {
+                    await ctx.telegram.sendMessage(order2.userId,
+                        `❌ <b>Order Ditolak</b>\n\n` +
+                        `🆔 Order: <code>${order2.orderId}</code>\n` +
+                        `📦 Produk: ${escapeHtml(order2.name)}\n` +
+                        `💬 Alasan: ${escapeHtml(rejectReason)}\n\n` +
+                        `Hubungi owner jika ada pertanyaan: @${config.ownerUsername}`,
+                        { parse_mode: "HTML" }
+                    );
+                } catch (e) {}
+
+                return ctx.reply(`❌ Order <code>${rejectOrderId}</code> ditolak.\nAlasan: ${escapeHtml(rejectReason)}`, { parse_mode: "HTML" });
+            }
+
+            // ===== LIST MANUAL ORDERS (OWNER) =====
+            case "manualorders": {
+                if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
+                const manualOrdersFile3 = path.join(__dirname, "database/manual_orders.json");
+                let manualOrders3 = [];
+                try { manualOrders3 = JSON.parse(fs.readFileSync(manualOrdersFile3)); } catch {}
+                const pending = manualOrders3.filter(o => o.status === "pending");
+                if (pending.length === 0) return ctx.reply("✅ Tidak ada order manual pending.");
+                let txt = `📋 <b>Order Manual Pending (${pending.length})</b>\n\n`;
+                pending.forEach(o => {
+                    txt += `🆔 <code>${o.orderId}</code>\n👤 @${o.username} (${o.userId})\n📦 ${escapeHtml(o.name)}\n💰 Rp${toRupiah(o.amount)}\n📅 ${new Date(o.created_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}\n\n`;
+                });
+                txt += `Konfirmasi: <code>${config.prefix}confirm [ID]</code>\nTolak: <code>${config.prefix}reject [ID]</code>`;
+                return ctx.reply(txt, { parse_mode: "HTML" });
+            }
+
             // ===== EDIT GARANSI (OWNER) =====
             case "editgaransi": {
                 if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
@@ -1023,9 +1131,50 @@ module.exports = (bot) => {
         const name = `VPS ${category} (${item.description})`;
         const garansiDaysUsed = hasGaransi ? (config.garansiDays || 30) : (config.garansiBaseDays || 12);
         const paketLabel = hasGaransi ? `🛡️ Garansi ${garansiDaysUsed} Hari` : `⚡ Garansi ${garansiDaysUsed} Hari`;
+
+        // Pilih metode pembayaran
+        const btns = [
+            [{ text: "💳 Bayar Otomatis (QRIS)", callback_data: `vps_autopay|${category}|${index}|${warrantyType}` }],
+            [{ text: "📲 Bayar Manual (Transfer)", callback_data: `vps_manualpay|${category}|${index}|${warrantyType}` }],
+            [{ text: "↩️ Kembali", callback_data: `vps_buy_item|${category}|${index}` }]
+        ];
+
+        const ssdMatch = category.match(/(\d+\s*GiB\s*\w*\s*SSD|\d+\s*GB\s*\w*\s*SSD|\d+\s*GiB\s*NMVe\s*SSD|\d+\s*GiB\s*NVMe\s*SSD|\d+\s*GiB\s*SSDNVMe)/i);
+        const storageInfo = ssdMatch ? ssdMatch[0] : "";
+
+        return ctx.reply(
+            `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐏𝐢𝐥𝐢𝐡 𝐏𝐞𝐦𝐛𝐚𝐲𝐚𝐫𝐚𝐧\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+            `⟢ Produk   : ${name}\n` +
+            `⟢ Storage  : ${storageInfo || "-"}\n` +
+            `⟢ Paket    : ${paketLabel}\n` +
+            `⟢ Total    : Rp${toRupiah(price)}\n\n` +
+            `━━━━━━━━━━━━━━━━━━━━\nPilih metode pembayaran:`,
+            { parse_mode: "Markdown", reply_markup: { inline_keyboard: btns } }
+        );
+    });
+
+    // VPS Auto Payment (QRIS)
+    bot.action(/vps_autopay\|(.+)/, async (ctx) => {
+        try { await ctx.answerCbQuery(); } catch {}
+        try { await ctx.deleteMessage(); } catch {}
+        const [category, indexStr, warrantyType] = ctx.match[1].split("|");
+        const index = parseInt(indexStr);
+        const vpsData = loadVps();
+        const items = vpsData[category];
+        if (!items || !items[index]) return ctx.reply("❌ Item tidak ditemukan!");
+        const item = items[index];
+        if (!item.accounts || item.accounts.length === 0) return ctx.reply("❌ Stok habis!");
+
+        const hasGaransi = warrantyType === "garansi";
+        const basePrice = hasGaransi ? (item.priceGaransi || item.price) : (item.priceNoGaransi || item.price);
+        const userId = ctx.from.id;
+        const fee = generateRandomFee();
+        const price = basePrice + fee;
+        const name = `VPS ${category} (${item.description})`;
+        const garansiDaysUsed = hasGaransi ? (config.garansiDays || 30) : (config.garansiBaseDays || 12);
+        const paketLabel = hasGaransi ? `🛡️ Garansi ${garansiDaysUsed} Hari` : `⚡ Garansi ${garansiDaysUsed} Hari`;
         const paymentType = config.paymentGateway;
 
-        // Ambil info SSD dari nama kategori otomatis
         const ssdMatch = category.match(/(\d+\s*GiB\s*\w*\s*SSD|\d+\s*GB\s*\w*\s*SSD|\d+\s*GiB\s*NMVe\s*SSD|\d+\s*GiB\s*NVMe\s*SSD|\d+\s*GiB\s*SSDNVMe)/i);
         const storageInfo = ssdMatch ? ssdMatch[0] : "";
 
@@ -1034,7 +1183,7 @@ module.exports = (bot) => {
             pay = await createPayment(paymentType, price, config, { customerName: `@${ctx.from.username || ctx.from.first_name}` });
         } catch (err) {
             console.error("[CREATE PAYMENT ERROR]", err.message);
-            return ctx.reply(`❌ Gagal membuat pembayaran: ${err.message}`);
+            return ctx.reply(`❌ Gagal membuat pembayaran otomatis: ${err.message}\n\nGunakan pembayaran manual sebagai alternatif.`);
         }
 
         orders[userId] = { type: "vps_stock", category, itemIndex: index, name, description: item.description, amount: price, fee, orderId: pay.orderId || null, transactionId: pay.transactionId || null, paymentType, chatId: ctx.chat.id, expireAt: Date.now() + 6 * 60 * 1000, hasGaransi, garansiDays: garansiDaysUsed, paketLabel };
@@ -1050,6 +1199,94 @@ module.exports = (bot) => {
         }
         orders[userId].qrMessageId = qrMsg.message_id;
         startCheck(userId, ctx);
+    });
+
+    // VPS Manual Payment (Transfer)
+    bot.action(/vps_manualpay\|(.+)/, async (ctx) => {
+        try { await ctx.answerCbQuery(); } catch {}
+        try { await ctx.deleteMessage(); } catch {}
+        const [category, indexStr, warrantyType] = ctx.match[1].split("|");
+        const index = parseInt(indexStr);
+        const vpsData = loadVps();
+        const items = vpsData[category];
+        if (!items || !items[index]) return ctx.reply("❌ Item tidak ditemukan!");
+        const item = items[index];
+        if (!item.accounts || item.accounts.length === 0) return ctx.reply("❌ Stok habis!");
+
+        const hasGaransi = warrantyType === "garansi";
+        const basePrice = hasGaransi ? (item.priceGaransi || item.price) : (item.priceNoGaransi || item.price);
+        const fee = generateRandomFee();
+        const price = basePrice + fee;
+        const name = `VPS ${category} (${item.description})`;
+        const garansiDaysUsed = hasGaransi ? (config.garansiDays || 30) : (config.garansiBaseDays || 12);
+        const paketLabel = hasGaransi ? `🛡️ Garansi ${garansiDaysUsed} Hari` : `⚡ Garansi ${garansiDaysUsed} Hari`;
+        const userId = ctx.from.id;
+
+        // Generate order ID manual
+        const manualOrderId = `MNL${Date.now().toString(36).toUpperCase()}`;
+
+        // Simpan pending manual order
+        const manualOrdersFile = path.join(__dirname, "database/manual_orders.json");
+        let manualOrders = [];
+        try { manualOrders = JSON.parse(fs.readFileSync(manualOrdersFile)); } catch {}
+        manualOrders.push({
+            orderId: manualOrderId,
+            userId,
+            username: ctx.from.username || ctx.from.first_name,
+            category,
+            itemIndex: index,
+            name,
+            description: item.description,
+            amount: price,
+            fee,
+            hasGaransi,
+            garansiDays: garansiDaysUsed,
+            paketLabel,
+            status: "pending",
+            created_at: new Date().toISOString()
+        });
+        fs.writeFileSync(manualOrdersFile, JSON.stringify(manualOrders, null, 2));
+
+        // Info pembayaran manual
+        let payInfo = "📲 <b>Transfer ke salah satu rekening:</b>\n\n";
+        if (config.payment.qris) payInfo += `• QRIS: <code>${config.payment.qris}</code>\n`;
+        if (config.payment.dana) payInfo += `• DANA: <code>${config.payment.dana}</code>\n`;
+        if (config.payment.ovo) payInfo += `• OVO: <code>${config.payment.ovo}</code>\n`;
+        if (config.payment.gopay) payInfo += `• GoPay: <code>${config.payment.gopay}</code>\n`;
+        if (!config.payment.qris && !config.payment.dana && !config.payment.ovo && !config.payment.gopay) {
+            payInfo += `• Hubungi owner: @${config.ownerUsername}\n`;
+        }
+
+        const msgText =
+            `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐏𝐞𝐦𝐛𝐚𝐲𝐚𝐫𝐚𝐧 𝐌𝐚𝐧𝐮𝐚𝐥\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+            `⟢ Order ID : <code>${manualOrderId}</code>\n` +
+            `⟢ Produk   : ${escapeHtml(name)}\n` +
+            `⟢ Paket    : ${paketLabel}\n` +
+            `⟢ Total    : <b>Rp${toRupiah(price)}</b>\n\n` +
+            `━━━━━━━━━━━━━━━━━━━━\n${payInfo}\n` +
+            `━━━━━━━━━━━━━━━━━━━━\n` +
+            `⚠️ <b>PENTING:</b>\n` +
+            `• Transfer <b>EXACT</b> Rp${toRupiah(price)}\n` +
+            `• Setelah transfer, kirim bukti ke owner\n` +
+            `• Sertakan Order ID: <code>${manualOrderId}</code>\n\n` +
+            `Owner: @${config.ownerUsername}`;
+
+        await ctx.reply(msgText, { parse_mode: "HTML" });
+
+        // Notif ke owner
+        try {
+            await ctx.telegram.sendMessage(config.ownerId,
+                `📥 <b>Order Manual Masuk!</b>\n\n` +
+                `🆔 Order: <code>${manualOrderId}</code>\n` +
+                `👤 User: @${ctx.from.username || ctx.from.first_name} (${userId})\n` +
+                `📦 Produk: ${escapeHtml(name)}\n` +
+                `🛡️ Paket: ${paketLabel}\n` +
+                `💰 Total: Rp${toRupiah(price)}\n\n` +
+                `Konfirmasi: <code>${config.prefix}confirm ${manualOrderId}</code>\n` +
+                `Tolak: <code>${config.prefix}reject ${manualOrderId}</code>`,
+                { parse_mode: "HTML" }
+            );
+        } catch (e) { console.error("[MANUAL PAY NOTIF]", e.message); }
     });
 
 
