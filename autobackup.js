@@ -89,9 +89,10 @@ async function performBackup(bot) {
       const fullPath = path.join(__dirname, file);
       const stat = fs.statSync(fullPath);
       if (stat.isDirectory()) {
-        // Skip node_modules di dalam subfolder juga
+        // Skip node_modules di dalam subfolder
         archive.directory(fullPath, file, (entry) => {
-          return !entry.name.includes("node_modules");
+          if (entry.name && entry.name.includes("node_modules")) return false;
+          return entry;
         });
       } else {
         archive.file(fullPath, { name: file });
