@@ -40,7 +40,7 @@ module.exports = {
 
   // Info payment manual
   payment: {
-    qris: "",          // Path foto QRIS statis (contoh: "./database/qris.jpg") atau URL
+    qris: "./database/qris.jpg",   // Path foto QRIS statis
     dana: "",
     ovo: "",
     gopay: ""
