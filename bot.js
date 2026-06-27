@@ -1440,13 +1440,121 @@ module.exports = (bot) => {
                     `📦 Produk: ${escapeHtml(order.name)}\n` +
                     `🛡️ Paket: ${order.paketLabel}\n` +
                     `💰 Total: <b>Rp${toRupiah(order.amount)}</b>\n` +
-                    `📅 Order: ${new Date(order.created_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}\n\n` +
-                    `━━━━━━━━━━━━━━━━━━━━\n` +
-                    `✅ Konfirmasi: <code>${config.prefix}confirm ${orderId}</code>\n` +
-                    `❌ Tolak: <code>${config.prefix}reject ${orderId}</code>`,
-                parse_mode: "HTML"
+                    `📅 Order: ${new Date(order.created_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}`,
+                parse_mode: "HTML",
+                reply_markup: { inline_keyboard: [
+                    [{ text: "✅ Konfirmasi", callback_data: `owner_confirm|${orderId}` }],
+                    [{ text: "❌ Tolak", callback_data: `owner_reject|${orderId}` }]
+                ]}
             });
         } catch (e) { console.error("[SEND PROOF TO OWNER]", e.message); }
+    });
+
+    // Owner confirm via button
+    bot.action(/owner_confirm\|(.+)/, async (ctx) => {
+        try { await ctx.answerCbQuery(); } catch {}
+        if (!isOwner(ctx)) return;
+        const orderId = ctx.match[1];
+        const manualOrdersFile = path.join(__dirname, "database/manual_orders.json");
+        let manualOrders = [];
+        try { manualOrders = JSON.parse(fs.readFileSync(manualOrdersFile)); } catch {}
+        const order = manualOrders.find(o => o.orderId === orderId && o.status === "pending");
+        if (!order) return ctx.editMessageCaption("❌ Order tidak ditemukan atau sudah diproses.", { parse_mode: "HTML" });
+
+        // Kirim akun VPS ke user
+        const vpsData = loadVps();
+        const items = vpsData[order.category];
+        if (!items || !items[order.itemIndex] || !items[order.itemIndex].accounts || items[order.itemIndex].accounts.length === 0) {
+            return ctx.editMessageCaption("❌ Stok sudah habis! Tidak bisa konfirmasi.", { parse_mode: "HTML" });
+        }
+        const item = items[order.itemIndex];
+        const account = item.accounts.shift();
+        item.stock = item.accounts.length;
+        if (item.accounts.length === 0) { vpsData[order.category].splice(order.itemIndex, 1); if (vpsData[order.category].length === 0) delete vpsData[order.category]; }
+        saveVps(vpsData);
+
+        // Update order status
+        order.status = "confirmed";
+        order.confirmed_at = new Date().toISOString();
+        fs.writeFileSync(manualOrdersFile, JSON.stringify(manualOrders, null, 2));
+
+        // Update user data
+        const users = loadUsers();
+        const user = users.find(u => u.id === order.userId);
+        if (user) {
+            user.totalSpent = (user.totalSpent || 0) + order.amount;
+            user.totalOrders = (user.totalOrders || 0) + 1;
+            if (!user.orders) user.orders = [];
+            user.orders.push({ product: order.name, price: order.amount, timestamp: new Date().toISOString(), garansi: order.hasGaransi, garansiDays: order.garansiDays, paymentMethod: "manual" });
+            saveUsers(users);
+        }
+
+        // Kirim akun ke user
+        const garansiExpiry = new Date(Date.now() + order.garansiDays * 24 * 60 * 60 * 1000).toLocaleDateString("id-ID");
+        try {
+            await ctx.telegram.sendMessage(order.userId,
+                `✅ <b>Pembayaran Dikonfirmasi!</b>\n\n` +
+                `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐎𝐫𝐝𝐞𝐫 𝐒𝐮𝐜𝐜𝐞𝐬𝐬\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `⟢ Produk : ${escapeHtml(order.name)}\n` +
+                `⟢ Paket  : ${order.paketLabel}\n` +
+                `⟢ Harga  : Rp${toRupiah(order.amount)}\n\n` +
+                `━━━━━━━━━━━━━━━━━━━━\n` +
+                `📋 <b>Detail Akun:</b>\n<code>${account}</code>\n\n` +
+                `━━━━━━━━━━━━━━━━━━━━\n` +
+                `🛡️ Garansi berlaku sampai: ${garansiExpiry}\n` +
+                `📌 Simpan pesan ini baik-baik!`,
+                { parse_mode: "HTML" }
+            );
+        } catch (e) { console.error("[CONFIRM SEND]", e.message); }
+
+        // Update caption di pesan owner
+        return ctx.editMessageCaption(
+            `✅ <b>Order Dikonfirmasi!</b>\n\n` +
+            `🆔 Order: <code>${orderId}</code>\n` +
+            `👤 User: @${order.username}\n` +
+            `📦 ${escapeHtml(order.name)}\n` +
+            `💰 Rp${toRupiah(order.amount)}`,
+            { parse_mode: "HTML" }
+        );
+    });
+
+    // Owner reject via button
+    bot.action(/owner_reject\|(.+)/, async (ctx) => {
+        try { await ctx.answerCbQuery(); } catch {}
+        if (!isOwner(ctx)) return;
+        const orderId = ctx.match[1];
+        const manualOrdersFile = path.join(__dirname, "database/manual_orders.json");
+        let manualOrders = [];
+        try { manualOrders = JSON.parse(fs.readFileSync(manualOrdersFile)); } catch {}
+        const order = manualOrders.find(o => o.orderId === orderId && o.status === "pending");
+        if (!order) return ctx.editMessageCaption("❌ Order tidak ditemukan atau sudah diproses.", { parse_mode: "HTML" });
+
+        order.status = "rejected";
+        order.rejected_at = new Date().toISOString();
+        order.reason = "Bukti pembayaran tidak valid";
+        fs.writeFileSync(manualOrdersFile, JSON.stringify(manualOrders, null, 2));
+
+        // Notif ke user
+        try {
+            await ctx.telegram.sendMessage(order.userId,
+                `❌ <b>Order Ditolak</b>\n\n` +
+                `🆔 Order: <code>${orderId}</code>\n` +
+                `📦 Produk: ${escapeHtml(order.name)}\n` +
+                `💬 Alasan: Bukti pembayaran tidak valid\n\n` +
+                `Hubungi owner jika ada pertanyaan: @${config.ownerUsername}`,
+                { parse_mode: "HTML" }
+            );
+        } catch (e) {}
+
+        // Update caption
+        return ctx.editMessageCaption(
+            `❌ <b>Order Ditolak</b>\n\n` +
+            `🆔 Order: <code>${orderId}</code>\n` +
+            `👤 User: @${order.username}\n` +
+            `📦 ${escapeHtml(order.name)}\n` +
+            `💰 Rp${toRupiah(order.amount)}`,
+            { parse_mode: "HTML" }
+        );
     });
 
 
