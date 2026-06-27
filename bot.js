@@ -140,6 +140,7 @@ const menuTextOwn = () => `<blockquote>( ⸙‌ ) 𝐃𝐈𝐆𝐈𝐂𝐎𝐑�
 ▢ ${config.prefix}update
 ▢ ${config.prefix}manualorders
 ▢ ${config.prefix}confirm
+▢ ${config.prefix}addqris
 </blockquote>`;
 
 const maintenanceFile = path.join(__dirname, "database/maintenance.json");
@@ -485,6 +486,43 @@ module.exports = (bot) => {
                 });
                 txt += `Konfirmasi: <code>${config.prefix}confirm [ID]</code>\nTolak: <code>${config.prefix}reject [ID]</code>`;
                 return ctx.reply(txt, { parse_mode: "HTML" });
+            }
+
+            // ===== ADD QRIS (OWNER) =====
+            case "addqris": {
+                if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
+                const photo = ctx.message.photo;
+                const doc = ctx.message.document;
+                const replyPhoto = ctx.message.reply_to_message?.photo;
+                const replyDoc = ctx.message.reply_to_message?.document;
+
+                if (!photo && !doc && !replyPhoto && !replyDoc) {
+                    return ctx.reply(
+                        `📸 <b>Cara pakai /addqris:</b>\n\n` +
+                        `1. Kirim <b>foto QRIS</b> dengan caption <code>${config.prefix}addqris</code>\n` +
+                        `2. Atau reply foto QRIS dengan <code>${config.prefix}addqris</code>\n\n` +
+                        `QRIS saat ini: ${fs.existsSync(path.join(__dirname, "database/qris.jpg")) ? "✅ Sudah ada" : "❌ Belum ada"}`,
+                        { parse_mode: "HTML" }
+                    );
+                }
+
+                try {
+                    let fileId;
+                    if (photo) fileId = photo[photo.length - 1].file_id;
+                    else if (doc) fileId = doc.file_id;
+                    else if (replyPhoto) fileId = replyPhoto[replyPhoto.length - 1].file_id;
+                    else if (replyDoc) fileId = replyDoc.file_id;
+
+                    const fileLink = await ctx.telegram.getFileLink(fileId);
+                    const axios = require("axios");
+                    const response = await axios.get(fileLink.href, { responseType: "arraybuffer" });
+                    const qrisPath = path.join(__dirname, "database/qris.jpg");
+                    fs.writeFileSync(qrisPath, response.data);
+                    return ctx.reply(`✅ <b>QRIS berhasil disimpan!</b>\n\nFile: database/qris.jpg\nSize: ${(response.data.length / 1024).toFixed(1)} KB\n\nQRIS ini akan tampil saat user pilih <b>Bayar Manual</b>.`, { parse_mode: "HTML" });
+                } catch (err) {
+                    console.error("[ADDQRIS ERROR]", err.message);
+                    return ctx.reply(`❌ Gagal menyimpan QRIS: ${err.message}`);
+                }
             }
 
             // ===== EDIT GARANSI (OWNER) =====
