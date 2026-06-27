@@ -140,9 +140,20 @@ const menuTextOwn = () => `<blockquote>( ⸙‌ ) 𝐃𝐈𝐆𝐈𝐂𝐎𝐑�
 ▢ ${config.prefix}update
 </blockquote>`;
 
+const maintenanceFile = path.join(__dirname, "database/maintenance.json");
+function getMaintenanceStatus() {
+    try {
+        if (fs.existsSync(maintenanceFile)) return JSON.parse(fs.readFileSync(maintenanceFile)).active;
+    } catch (e) {}
+    return false;
+}
+function setMaintenanceStatus(active) {
+    fs.writeFileSync(maintenanceFile, JSON.stringify({ active, updated_at: new Date().toISOString() }));
+}
+
 const mainKeyboard = (ctx) => {
     const keyboard = [];
-    if (config.maintenance && !isOwner(ctx)) {
+    if (getMaintenanceStatus() && !isOwner(ctx)) {
         keyboard.push([{ text: "🔧 Maintenance — Mohon Tunggu", callback_data: "maintenance_info" }]);
     } else {
         keyboard.push([{ text: "Order VPS/RDP", callback_data: "buy_vps" }]);
@@ -226,7 +237,7 @@ module.exports = (bot) => {
         if (isBlacklisted(fromId) && isCmd) return ctx.reply("🚫 Anda telah di-blacklist dan tidak dapat menggunakan bot ini.");
 
         // Maintenance check
-        if (config.maintenance && !isOwner(ctx) && isCmd) {
+        if (getMaintenanceStatus() && !isOwner(ctx) && isCmd) {
             const allowedInMaint = ["menu", "start", "profile", "history", "support", "ticket", "cektiket", "myticket", "tiket", "claimgaransi", "claim", "cekclaim", "myclaim"];
             if (!allowedInMaint.includes(command)) return ctx.reply("🔧 Bot sedang dalam pemeliharaan.\nSilakan coba lagi nanti.");
         }
@@ -354,16 +365,16 @@ module.exports = (bot) => {
                     `📦 Stok VPS: ${totalVpsStock}\n` +
                     `⭐ Rating: ${avgRating}/5 (${reviews.length})\n` +
                     `⏱️ Uptime: ${getRuntimeBot()}\n` +
-                    `🔧 Maintenance: ${config.maintenance ? "ON" : "OFF"}`;
+                    `🔧 Maintenance: ${getMaintenanceStatus() ? "ON" : "OFF"}`;
                 return ctx.reply(statsText, { parse_mode: "HTML" });
             }
 
             // ===== MAINTENANCE MODE =====
             case "maintenance": {
                 if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
-                if (text === "on") { config.maintenance = true; return ctx.reply("🔧 Maintenance mode <b>AKTIF</b>.\nUser tidak bisa order.", { parse_mode: "HTML" }); }
-                if (text === "off") { config.maintenance = false; return ctx.reply("✅ Maintenance mode <b>NONAKTIF</b>.\nBot kembali normal.", { parse_mode: "HTML" }); }
-                return ctx.reply(`Status: ${config.maintenance ? "🔧 ON" : "✅ OFF"}\n\nGunakan:\n<code>${config.prefix}maintenance on</code>\n<code>${config.prefix}maintenance off</code>`, { parse_mode: "HTML" });
+                if (text === "on") { setMaintenanceStatus(true); return ctx.reply("🔧 Maintenance mode <b>AKTIF</b>.\nUser tidak bisa order.", { parse_mode: "HTML" }); }
+                if (text === "off") { setMaintenanceStatus(false); return ctx.reply("✅ Maintenance mode <b>NONAKTIF</b>.\nBot kembali normal.", { parse_mode: "HTML" }); }
+                return ctx.reply(`Status: ${getMaintenanceStatus() ? "🔧 ON" : "✅ OFF"}\n\nGunakan:\n<code>${config.prefix}maintenance on</code>\n<code>${config.prefix}maintenance off</code>`, { parse_mode: "HTML" });
             }
 
             // ===== EDIT GARANSI (OWNER) =====
