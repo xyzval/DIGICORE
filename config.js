@@ -38,9 +38,9 @@ module.exports = {
     apiKey: ""
   },
 
-  // Info payment manual (opsional)
+  // Info payment manual
   payment: {
-    qris: "",
+    qris: "",          // Path foto QRIS statis (contoh: "./database/qris.jpg") atau URL
     dana: "",
     ovo: "",
     gopay: ""

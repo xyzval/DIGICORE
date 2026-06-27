@@ -1201,7 +1201,7 @@ module.exports = (bot) => {
         startCheck(userId, ctx);
     });
 
-    // VPS Manual Payment (Transfer)
+    // VPS Manual Payment (QRIS Statis + Nominal Unik)
     bot.action(/vps_manualpay\|(.+)/, async (ctx) => {
         try { await ctx.answerCbQuery(); } catch {}
         try { await ctx.deleteMessage(); } catch {}
@@ -1247,31 +1247,56 @@ module.exports = (bot) => {
         });
         fs.writeFileSync(manualOrdersFile, JSON.stringify(manualOrders, null, 2));
 
-        // Info pembayaran manual
-        let payInfo = "📲 <b>Transfer ke salah satu rekening:</b>\n\n";
-        if (config.payment.qris) payInfo += `• QRIS: <code>${config.payment.qris}</code>\n`;
-        if (config.payment.dana) payInfo += `• DANA: <code>${config.payment.dana}</code>\n`;
-        if (config.payment.ovo) payInfo += `• OVO: <code>${config.payment.ovo}</code>\n`;
-        if (config.payment.gopay) payInfo += `• GoPay: <code>${config.payment.gopay}</code>\n`;
-        if (!config.payment.qris && !config.payment.dana && !config.payment.ovo && !config.payment.gopay) {
-            payInfo += `• Hubungi owner: @${config.ownerUsername}\n`;
-        }
-
-        const msgText =
+        const captionText =
             `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐏𝐞𝐦𝐛𝐚𝐲𝐚𝐫𝐚𝐧 𝐌𝐚𝐧𝐮𝐚𝐥\n━━━━━━━━━━━━━━━━━━━━\n\n` +
-            `⟢ Order ID : <code>${manualOrderId}</code>\n` +
-            `⟢ Produk   : ${escapeHtml(name)}\n` +
+            `⟢ Order ID : ${manualOrderId}\n` +
+            `⟢ Produk   : ${name}\n` +
             `⟢ Paket    : ${paketLabel}\n` +
-            `⟢ Total    : <b>Rp${toRupiah(price)}</b>\n\n` +
-            `━━━━━━━━━━━━━━━━━━━━\n${payInfo}\n` +
+            `⟢ Total    : Rp${toRupiah(price)}\n\n` +
             `━━━━━━━━━━━━━━━━━━━━\n` +
-            `⚠️ <b>PENTING:</b>\n` +
-            `• Transfer <b>EXACT</b> Rp${toRupiah(price)}\n` +
-            `• Setelah transfer, kirim bukti ke owner\n` +
-            `• Sertakan Order ID: <code>${manualOrderId}</code>\n\n` +
-            `Owner: @${config.ownerUsername}`;
+            `⚠️ TRANSFER EXACT: Rp${toRupiah(price)}\n` +
+            `(Nominal unik agar mudah diverifikasi)\n\n` +
+            `━━━━━━━━━━━━━━━━━━━━\n` +
+            `📌 Setelah transfer:\n` +
+            `• Screenshot bukti bayar\n` +
+            `• Kirim ke owner: @${config.ownerUsername}\n` +
+            `• Sertakan Order ID: ${manualOrderId}\n\n` +
+            `⏳ Konfirmasi maks 1x24 jam`;
 
-        await ctx.reply(msgText, { parse_mode: "HTML" });
+        // Kirim foto QRIS statis jika ada
+        const qrisPath = config.payment.qris;
+        if (qrisPath) {
+            try {
+                let photo;
+                if (qrisPath.startsWith("http")) {
+                    photo = qrisPath;
+                } else {
+                    const fullPath = path.resolve(__dirname, qrisPath);
+                    if (fs.existsSync(fullPath)) {
+                        photo = { source: fullPath };
+                    }
+                }
+                if (photo) {
+                    await ctx.replyWithPhoto(photo, {
+                        caption: captionText,
+                        parse_mode: "Markdown",
+                        reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: `cancel_manual|${manualOrderId}` }]] }
+                    });
+                } else {
+                    await ctx.reply(captionText + `\n\n📲 QRIS: ${config.payment.qris}`, { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: `cancel_manual|${manualOrderId}` }]] } });
+                }
+            } catch (e) {
+                await ctx.reply(captionText, { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: `cancel_manual|${manualOrderId}` }]] } });
+            }
+        } else {
+            // Tidak ada QRIS, tampilkan info transfer lain
+            let payInfo = "";
+            if (config.payment.dana) payInfo += `• DANA: ${config.payment.dana}\n`;
+            if (config.payment.ovo) payInfo += `• OVO: ${config.payment.ovo}\n`;
+            if (config.payment.gopay) payInfo += `• GoPay: ${config.payment.gopay}\n`;
+            if (!payInfo) payInfo = `• Hubungi owner: @${config.ownerUsername}\n`;
+            await ctx.reply(captionText + `\n\n📲 Transfer ke:\n${payInfo}`, { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan Order", callback_data: `cancel_manual|${manualOrderId}` }]] } });
+        }
 
         // Notif ke owner
         try {
@@ -1281,12 +1306,29 @@ module.exports = (bot) => {
                 `👤 User: @${ctx.from.username || ctx.from.first_name} (${userId})\n` +
                 `📦 Produk: ${escapeHtml(name)}\n` +
                 `🛡️ Paket: ${paketLabel}\n` +
-                `💰 Total: Rp${toRupiah(price)}\n\n` +
+                `💰 Total: <b>Rp${toRupiah(price)}</b>\n\n` +
                 `Konfirmasi: <code>${config.prefix}confirm ${manualOrderId}</code>\n` +
                 `Tolak: <code>${config.prefix}reject ${manualOrderId}</code>`,
                 { parse_mode: "HTML" }
             );
         } catch (e) { console.error("[MANUAL PAY NOTIF]", e.message); }
+    });
+
+    // Cancel manual order
+    bot.action(/cancel_manual\|(.+)/, async (ctx) => {
+        try { await ctx.answerCbQuery(); } catch {}
+        const orderId = ctx.match[1];
+        const manualOrdersFile = path.join(__dirname, "database/manual_orders.json");
+        let manualOrders = [];
+        try { manualOrders = JSON.parse(fs.readFileSync(manualOrdersFile)); } catch {}
+        const order = manualOrders.find(o => o.orderId === orderId && o.status === "pending");
+        if (order) {
+            order.status = "cancelled";
+            order.cancelled_at = new Date().toISOString();
+            fs.writeFileSync(manualOrdersFile, JSON.stringify(manualOrders, null, 2));
+        }
+        try { await ctx.deleteMessage(); } catch {}
+        return ctx.reply("❌ Order manual dibatalkan.");
     });
 
 
