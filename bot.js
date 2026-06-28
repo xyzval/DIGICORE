@@ -62,7 +62,7 @@ const markUserDead = (users, targetId, error) => {
 };
 
 function getTotalOrderUsers() {
-    try { const users = loadUsers(); return Array.isArray(users) ? users.length : Object.keys(users).length; } catch { return 0; }
+    try { const users = loadUsers(); return users.reduce((count, u) => count + (u.history ? u.history.length : 0), 0); } catch { return 0; }
 }
 function randomNumber(length = 5) { const min = Math.pow(10, length - 1); return Math.floor(min + Math.random() * (Math.pow(10, length) - min)).toString(); }
 function generateRandomFee(min = 100, max = 200) { return Math.floor(Math.random() * (max - min + 1)) + min; }
