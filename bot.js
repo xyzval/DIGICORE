@@ -61,7 +61,10 @@ const markUserDead = (users, targetId, error) => {
     return true;
 };
 
-function getTotalOrderUsers() {
+function getTotalUsers() {
+    try { const users = loadUsers(); return Array.isArray(users) ? users.length : Object.keys(users).length; } catch { return 0; }
+}
+function getTotalOrders() {
     try { const users = loadUsers(); return users.reduce((count, u) => count + (u.history ? u.history.length : 0), 0); } catch { return 0; }
 }
 function randomNumber(length = 5) { const min = Math.pow(10, length - 1); return Math.floor(min + Math.random() * (Math.pow(10, length) - min)).toString(); }
@@ -95,7 +98,8 @@ Halo, @${ctx.from.username || "—"}
 
 📊 Dashboard
 ╔═══════════════════╗
-║ 📦 ${getTotalOrderUsers()} Orders${" ".repeat(Math.max(0, 10 - String(getTotalOrderUsers()).length))}║
+║ 👤 ${getTotalUsers()} Users${" ".repeat(Math.max(0, 10 - String(getTotalUsers()).length))}║
+║ 📦 ${getTotalOrders()} Orders${" ".repeat(Math.max(0, 9 - String(getTotalOrders()).length))}║
 ║ ⭐ ${avgRating} Rating${" ".repeat(Math.max(0, 9 - avgRating.length))}║
 ║ 💻 ${totalVpsStock} VPS Ready${" ".repeat(Math.max(0, 7 - String(totalVpsStock).length))}║
 ╚═══════════════════╝
