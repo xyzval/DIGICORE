@@ -1233,6 +1233,7 @@ module.exports = (bot) => {
         }
 
         orders[userId] = { type: "vps_stock", category, itemIndex: index, name, description: item.description, amount: price, fee, orderId: pay.orderId || null, transactionId: pay.transactionId || null, paymentType, chatId: ctx.chat.id, expireAt: Date.now() + 6 * 60 * 1000, hasGaransi, garansiDays: garansiDaysUsed, paketLabel };
+        console.log("[ORDER CREATED]", { userId, paymentType, orderId: pay.orderId, amount: price });
 
         let qrMsg;
         try {
@@ -1685,7 +1686,7 @@ module.exports = (bot) => {
             }
 
             let paid = false;
-            try { paid = await cekPaid(order.paymentType, order, config, { userId, orders, toRupiah }); } catch (e) { return; }
+            try { paid = await cekPaid(order.paymentType, order, config, { userId, orders, toRupiah }); } catch (e) { console.error("[PAYMENT CHECK ERROR]", order.paymentType, order.orderId, e.message); return; }
             if (!paid) return;
 
             clearInterval(intv);
