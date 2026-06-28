@@ -14,7 +14,7 @@ module.exports = {
   loc: "1",
 
   // 👉 Pilih: "orderkuota", "pakasir", "violet", atau "payvalls"
-  paymentGateway: "payvalls",
+  paymentGateway: "pakasir",
 
   // ===== PayValls (pay.valls.cloud) Config =====
   payvalls: {
@@ -40,8 +40,8 @@ module.exports = {
 
   // ===== Pakasir Config =====
   pakasir: {
-    slug: "",
-    apiKey: ""
+    slug: "digicore",
+    apiKey: "aRai7I6sFpvh2OzBQmodDC6tU5KW2dTe"
   },
 
   // Info payment manual
