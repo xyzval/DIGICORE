@@ -1236,8 +1236,22 @@ module.exports = (bot) => {
 
         let qrMsg;
         try {
-            const photo = (paymentType === "pakasir" || paymentType === "payvalls") ? { source: pay.qris } : pay.qris;
-            qrMsg = await ctx.replyWithPhoto(photo, { caption: `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐏𝐚𝐲𝐦𝐞𝐧𝐭\n━━━━━━━━━━━━━━━━━━━━\n\n⟢ Produk   : ${name}\n⟢ Storage  : ${storageInfo || "-"}\n⟢ Paket    : ${paketLabel}\n⟢ Total    : Rp${toRupiah(price)}\n\n━━━━━━━━━━━━━━━━━━━━\n⏳ Expired: 6 Menit\n📲 Scan QRIS untuk pembayaran`, parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan", callback_data: "cancel_order" }]] } });
+            if (pay.qris) {
+                const photo = (paymentType === "pakasir" || paymentType === "payvalls") ? { source: pay.qris } : pay.qris;
+                qrMsg = await ctx.replyWithPhoto(photo, { caption: `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐏𝐚𝐲𝐦𝐞𝐧𝐭\n━━━━━━━━━━━━━━━━━━━━\n\n⟢ Produk   : ${name}\n⟢ Storage  : ${storageInfo || "-"}\n⟢ Paket    : ${paketLabel}\n⟢ Total    : Rp${toRupiah(price)}\n\n━━━━━━━━━━━━━━━━━━━━\n⏳ Expired: 6 Menit\n📲 Scan QRIS untuk pembayaran`, parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan", callback_data: "cancel_order" }]] } });
+            } else {
+                // PayValls/Saweria: kirim link pembayaran (bukan QR)
+                qrMsg = await ctx.reply(
+                    `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐏𝐚𝐲𝐦𝐞𝐧𝐭\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                    `⟢ Produk   : ${name}\n⟢ Storage  : ${storageInfo || "-"}\n⟢ Paket    : ${paketLabel}\n⟢ Total    : Rp${toRupiah(pay.amount)}\n\n` +
+                    `━━━━━━━━━━━━━━━━━━━━\n` +
+                    `🔗 Link Pembayaran:\n${pay.paymentLink}\n\n` +
+                    `⚠️ ISI NOMINAL TEPAT: ${pay.amount}\n` +
+                    `⏳ Expired: 6 Menit\n` +
+                    `✅ Otomatis terkonfirmasi setelah bayar`,
+                    { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "❌ Batalkan", callback_data: "cancel_order" }]] } }
+                );
+            }
         } catch (err) {
             console.error("[SEND QR ERROR]", err.message);
             delete orders[userId];
