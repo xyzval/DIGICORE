@@ -18,13 +18,13 @@ module.exports = {
 
   // ===== PayValls (pay.valls.cloud) Config =====
   payvalls: {
-    apiKey: "PAY-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",  // Ganti dengan API Key dari /addmerchant
+    apiKey: "PAY-a55079cc9c36149055ba1ff4912e9165",  // Ganti dengan API Key dari /addmerchant
     baseUrl: "https://pay.valls.cloud"
   },
 
   // ===== Violet Config =====
   violet: {
-    apiKey: "zD1jSaZqpLdivH58tcmsgnwAloA0y63",
+    apiKey: "peli",
     secretKey: "yv4u1e7s9pAZxhA3q2LnmH6dbfgi0L8arjlzwtkBoCDPScJ5",
     live: true,
     codePayment: "QRIS",
