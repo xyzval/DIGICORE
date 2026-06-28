@@ -13,8 +13,14 @@ module.exports = {
   egg: "1",
   loc: "1",
 
-  // 👉 Pilih: "orderkuota", "pakasir", atau "violet"
-  paymentGateway: "violet",
+  // 👉 Pilih: "orderkuota", "pakasir", "violet", atau "payvalls"
+  paymentGateway: "payvalls",
+
+  // ===== PayValls (pay.valls.cloud) Config =====
+  payvalls: {
+    apiKey: "PAY-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",  // Ganti dengan API Key dari /addmerchant
+    baseUrl: "https://pay.valls.cloud"
+  },
 
   // ===== Violet Config =====
   violet: {
