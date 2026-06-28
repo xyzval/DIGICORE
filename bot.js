@@ -135,7 +135,7 @@ const menuTextOwn = () => `<blockquote>( ⸙‌ ) 𝐃𝐈𝐆𝐈𝐂𝐎𝐑�
 ▢ ${config.prefix}closeticket
 ▢ ${config.prefix}claims
 ▢ ${config.prefix}approve
-▢ ${config.prefix}reject
+▢ ${config.prefix}rejectclaim
 ▢ ${config.prefix}sendclaim
 ▢ ${config.prefix}update
 ▢ ${config.prefix}manualorders
@@ -721,7 +721,8 @@ module.exports = (bot) => {
 
                 const claimId = String(claims.length + 1).padStart(3, "0");
                 const orderTime = new Date(lastOrder.timestamp).getTime();
-                const expiryDate = new Date(orderTime + (GARANSI_DAYS * 24 * 60 * 60 * 1000));
+                const garansiDaysForClaim = lastOrder.garansiDays || (lastOrder.hasGaransi ? (config.garansiDays || 30) : (config.garansiBaseDays || 12));
+                const expiryDate = new Date(orderTime + (garansiDaysForClaim * 24 * 60 * 60 * 1000));
 
                 claims.push({
                     id: claimId,
@@ -752,7 +753,7 @@ module.exports = (bot) => {
                         `📅 Beli: ${new Date(lastOrder.timestamp).toLocaleDateString("id-ID")}\n` +
                         `📝 Alasan: ${escapeHtml(text)}\n\n` +
                         `✅ <code>${config.prefix}approve ${claimId}</code>\n` +
-                        `❌ <code>${config.prefix}reject ${claimId} [alasan]</code>`,
+                        `❌ <code>${config.prefix}rejectclaim ${claimId} [alasan]</code>`,
                         { parse_mode: "HTML" });
                 } catch (e) {}
                 return;
@@ -796,7 +797,7 @@ module.exports = (bot) => {
                 if (pending.length === 0) return ctx.reply("✅ Tidak ada claim pending.");
                 let cText = `🛡️ <b>Claim Pending</b> (${pending.length})\n\n`;
                 [...pending].reverse().slice(0, 10).forEach(c => {
-                    cText += `<b>#${c.id}</b> 👤 @${escapeHtml(c.username)}\n📦 ${escapeHtml(c.product)}\n📝 ${escapeHtml(c.reason.substring(0, 50))}\n✅ <code>${config.prefix}approve ${c.id}</code> | ❌ <code>${config.prefix}reject ${c.id}</code>\n\n`;
+                    cText += `<b>#${c.id}</b> 👤 @${escapeHtml(c.username)}\n📦 ${escapeHtml(c.product)}\n📝 ${escapeHtml(c.reason.substring(0, 50))}\n✅ <code>${config.prefix}approve ${c.id}</code> | ❌ <code>${config.prefix}rejectclaim ${c.id}</code>\n\n`;
                 });
                 return ctx.reply(cText, { parse_mode: "HTML" });
             }
@@ -832,9 +833,9 @@ module.exports = (bot) => {
             }
 
             // ===== REJECT CLAIM (OWNER) =====
-            case "reject": {
+            case "rejectclaim": {
                 if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
-                if (!text) return ctx.reply(`Format: <code>${config.prefix}reject [ID] [alasan]</code>`, { parse_mode: "HTML" });
+                if (!text) return ctx.reply(`Format: <code>${config.prefix}rejectclaim [ID] [alasan]</code>`, { parse_mode: "HTML" });
                 const parts2 = text.split(" ");
                 const claimId2 = parts2[0].replace("#", "");
                 const reason = parts2.slice(1).join(" ") || "Tidak memenuhi syarat garansi";
