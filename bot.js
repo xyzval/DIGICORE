@@ -1445,10 +1445,119 @@ module.exports = (bot) => {
         );
     });
 
-    // Listen for photo proof from user
+    // Listen for photo from user (bukti bayar, DM reply, support)
     bot.on("photo", async (ctx) => {
         const userId = ctx.from.id;
-        if (!waitingProof[userId]) return; // bukan menunggu bukti
+        const userName = ctx.from.username || ctx.from.first_name;
+        const caption = (ctx.message.caption || "").trim();
+        const photoId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+        const jam = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
+
+        // === Owner kirim foto via /dm ===
+        if (caption.startsWith(prefix + "dm") && userId.toString() === config.ownerId) {
+            const args = caption.slice(prefix.length + 2).trim().split(" ");
+            const targetInput = args[0];
+            const dmMsg = args.slice(1).join(" ");
+            if (!targetInput) return ctx.reply(`Format: kirim foto dengan caption <code>${config.prefix}dm @user [pesan]</code>`, { parse_mode: "HTML" });
+
+            const users = JSON.parse(fs.readFileSync(path.join(__dirname, "/database/users.json")));
+            const dmSearch = targetInput.replace("@", "").trim();
+            const dmUser = users.find(u => String(u.id) === dmSearch || (u.username && u.username.toLowerCase() === dmSearch.toLowerCase()));
+            if (!dmUser) return ctx.reply(`❌ User <b>${escapeHtml(targetInput)}</b> tidak ditemukan.`, { parse_mode: "HTML" });
+
+            try {
+                await ctx.telegram.sendPhoto(dmUser.id, photoId, {
+                    caption: `📩 <b>Pesan dari Admin</b>\n━━━━━━━━━━━━━━━━━━━━\n\n${dmMsg ? escapeHtml(dmMsg) : "<i>(foto)</i>"}\n\n━━━━━━━━━━━━━━━━━━━━\n⏰ ${jam} WIB\n↩️ Reply untuk membalas`,
+                    parse_mode: "HTML"
+                });
+                return ctx.reply(`✅ <b>Foto + pesan terkirim!</b>\n\n👤 Ke: @${escapeHtml(dmUser.username || dmUser.first_name || "-")} (<code>${dmUser.id}</code>)`, { parse_mode: "HTML" });
+            } catch (e) {
+                return ctx.reply(`❌ Gagal mengirim: ${escapeHtml(e.message || "User block bot")}`, { parse_mode: "HTML" });
+            }
+        }
+
+        // === User kirim foto via /support ===
+        if (caption.startsWith(prefix + "support") || caption.startsWith(prefix + "ticket")) {
+            const text = caption.slice(caption.indexOf(" ") + 1).trim();
+            const msg = text && text !== caption ? text : "(foto terlampir)";
+            const ticketDB2 = path.join(__dirname, "/database/tickets.json");
+            const tickets = JSON.parse(fs.readFileSync(ticketDB2));
+            const ticketId = String(tickets.length + 1).padStart(3, "0");
+            tickets.push({ id: ticketId, userId, username: userName, first_name: ctx.from.first_name || "", message: msg, status: "open", replies: [], created_at: new Date().toISOString(), last_activity: new Date().toISOString(), closed_at: null });
+            fs.writeFileSync(ticketDB2, JSON.stringify(tickets, null, 2));
+
+            const tglBuat = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+            await ctx.reply(`🎫 <b>Tiket Support #${ticketId}</b>\n━━━━━━━━━━━━━━━━━━━━\n\n📝 ${escapeHtml(msg)}\n📷 Foto terlampir\n\n━━━━━━━━━━━━━━━━━━━━\n⏰ ${tglBuat} WIB\n⏳ Menunggu balasan admin\n\n↩️ Reply untuk menambah pesan`, { parse_mode: "HTML" });
+
+            try {
+                await ctx.telegram.sendPhoto(config.ownerId, photoId, {
+                    caption: `🔔 <b>Tiket Baru #${ticketId}</b>\n━━━━━━━━━━━━━━━━━━━━\n\n👤 @${escapeHtml(userName)} (<code>${userId}</code>)\n📝 ${escapeHtml(msg)}\n\n━━━━━━━━━━━━━━━━━━━━\n↩️ Reply untuk membalas\n<code>${config.prefix}reply ${ticketId} [pesan]</code>`,
+                    parse_mode: "HTML"
+                });
+            } catch (e) {}
+            return;
+        }
+
+        // === Reply foto ke DM atau Tiket ===
+        if (ctx.message.reply_to_message) {
+            const replyText = ctx.message.reply_to_message.text || ctx.message.reply_to_message.caption || "";
+
+            // User reply DM dengan foto
+            if (replyText.includes("Pesan dari Admin") && userId.toString() !== config.ownerId) {
+                try {
+                    await ctx.telegram.sendPhoto(config.ownerId, photoId, {
+                        caption: `📩 <b>Balasan DM dari User</b>\n━━━━━━━━━━━━━━━━━━━━\n\n👤 @${escapeHtml(userName)} (<code>${userId}</code>)\n📝 ${caption ? escapeHtml(caption) : "<i>(foto)</i>"}\n\n━━━━━━━━━━━━━━━━━━━━\n⏰ ${jam} WIB\n↩️ Balas: <code>${config.prefix}dm @${escapeHtml(userName)} [pesan]</code>`,
+                        parse_mode: "HTML"
+                    });
+                    await ctx.reply(`✅ Foto + balasan terkirim ke admin!`, { parse_mode: "HTML" });
+                } catch (e) {}
+                return;
+            }
+
+            // User/Owner reply tiket dengan foto
+            const match = replyText.match(/Tiket.*?#(\d+)|#(\d{3})/);
+            if (match) {
+                const tid = match[1] || match[2];
+                const ticketDB2 = path.join(__dirname, "/database/tickets.json");
+                const tickets = JSON.parse(fs.readFileSync(ticketDB2));
+
+                if (userId.toString() === config.ownerId) {
+                    // Owner reply tiket dengan foto
+                    const idx = tickets.findIndex(t => t.id === tid && t.status === "open");
+                    if (idx !== -1) {
+                        tickets[idx].replies.push({ from: "admin", message: caption || "(foto)", timestamp: new Date().toISOString() });
+                        tickets[idx].last_activity = new Date().toISOString();
+                        fs.writeFileSync(ticketDB2, JSON.stringify(tickets, null, 2));
+                        try {
+                            await ctx.telegram.sendPhoto(tickets[idx].userId, photoId, {
+                                caption: `💬 <b>Tiket #${tid} — Balasan Admin</b>\n━━━━━━━━━━━━━━━━━━━━\n\n${caption ? escapeHtml(caption) : "<i>(foto)</i>"}\n\n━━━━━━━━━━━━━━━━━━━━\n⏰ ${jam} WIB\n↩️ Reply untuk membalas`,
+                                parse_mode: "HTML"
+                            });
+                        } catch (e) {}
+                        return ctx.reply(`✅ Foto + balasan terkirim ke tiket <b>#${tid}</b>`, { parse_mode: "HTML" });
+                    }
+                } else {
+                    // User reply tiket dengan foto
+                    const idx = tickets.findIndex(t => t.id === tid && t.userId === userId && t.status === "open");
+                    if (idx !== -1) {
+                        tickets[idx].replies.push({ from: "user", message: caption || "(foto)", timestamp: new Date().toISOString() });
+                        tickets[idx].last_activity = new Date().toISOString();
+                        fs.writeFileSync(ticketDB2, JSON.stringify(tickets, null, 2));
+                        await ctx.reply(`✅ Foto + balasan tiket <b>#${tid}</b> terkirim!`, { parse_mode: "HTML" });
+                        try {
+                            await ctx.telegram.sendPhoto(config.ownerId, photoId, {
+                                caption: `💬 <b>Tiket #${tid} — Balasan User</b>\n━━━━━━━━━━━━━━━━━━━━\n\n👤 @${escapeHtml(userName)} (<code>${userId}</code>)\n📝 ${caption ? escapeHtml(caption) : "<i>(foto)</i>"}\n\n━━━━━━━━━━━━━━━━━━━━\n⏰ ${jam} WIB\n↩️ Reply untuk membalas`,
+                                parse_mode: "HTML"
+                            });
+                        } catch (e) {}
+                        return;
+                    }
+                }
+            }
+        }
+
+        // === Bukti bayar manual order ===
+        if (!waitingProof[userId]) return;
 
         const orderId = waitingProof[userId];
         delete waitingProof[userId];
@@ -1469,7 +1578,6 @@ module.exports = (bot) => {
         );
 
         // Forward bukti + info ke owner
-        const photoId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
         try {
             await ctx.telegram.sendPhoto(config.ownerId, photoId, {
                 caption:
