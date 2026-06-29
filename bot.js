@@ -412,7 +412,7 @@ module.exports = (bot) => {
         // Owner reply ticket via reply message
         if (!isCmd && isOwner(ctx) && ctx.message.reply_to_message) {
             const replyText = ctx.message.reply_to_message.text || "";
-            const match = replyText.match(/Tiket #(\d+)|#(\d{3})/);
+            const match = replyText.match(/Tiket.*?#(\d+)|#(\d{3})/);
             if (match) {
                 const tid = match[1] || match[2];
                 const tickets = loadTickets();
@@ -421,7 +421,8 @@ module.exports = (bot) => {
                     tickets[idx].replies.push({ from: "admin", message: body, timestamp: new Date().toISOString() });
                     tickets[idx].last_activity = new Date().toISOString();
                     saveTickets(tickets);
-                    try { await ctx.telegram.sendMessage(tickets[idx].userId, `💬 <b>Balasan Tiket #${tid}</b>\n\n💬 <b>Admin:</b>\n${escapeHtml(body)}\n\n<i>Reply pesan ini untuk membalas.</i>`, { parse_mode: "HTML" }); } catch (e) {}
+                    const jam = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
+                    try { await ctx.telegram.sendMessage(tickets[idx].userId, `💬 <b>Tiket #${tid} — Balasan Admin</b>\n━━━━━━━━━━━━━━━━━━━━\n\n${escapeHtml(body)}\n\n━━━━━━━━━━━━━━━━━━━━\n⏰ ${jam} WIB\n↩️ Reply untuk membalas`, { parse_mode: "HTML" }); } catch (e) {}
                     return ctx.reply(`✅ Balasan terkirim ke tiket <b>#${tid}</b>`, { parse_mode: "HTML" });
                 }
             }
@@ -430,7 +431,7 @@ module.exports = (bot) => {
         // User reply ticket via reply message
         if (!isCmd && !isOwner(ctx) && ctx.message.reply_to_message) {
             const replyText = ctx.message.reply_to_message.text || "";
-            const match = replyText.match(/Tiket #(\d+)|#(\d{3})/);
+            const match = replyText.match(/Tiket.*?#(\d+)|#(\d{3})/);
             if (match) {
                 const tid = match[1] || match[2];
                 const tickets = loadTickets();
@@ -440,7 +441,8 @@ module.exports = (bot) => {
                     tickets[idx].last_activity = new Date().toISOString();
                     saveTickets(tickets);
                     await ctx.reply(`✅ Balasan tiket <b>#${tid}</b> terkirim!`, { parse_mode: "HTML" });
-                    try { await ctx.telegram.sendMessage(config.ownerId, `💬 <b>BALASAN TIKET #${tid}</b>\n\n👤 @${escapeHtml(userName)}\n📝 ${escapeHtml(body)}\n\n<i>Reply pesan ini untuk membalas.</i>`, { parse_mode: "HTML" }); } catch (e) {}
+                    const jam = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
+                    try { await ctx.telegram.sendMessage(config.ownerId, `💬 <b>Tiket #${tid} — Balasan User</b>\n━━━━━━━━━━━━━━━━━━━━\n\n👤 @${escapeHtml(userName)} (<code>${fromId}</code>)\n📝 ${escapeHtml(body)}\n\n━━━━━━━━━━━━━━━━━━━━\n⏰ ${jam} WIB\n↩️ Reply untuk membalas`, { parse_mode: "HTML" }); } catch (e) {}
                     return;
                 }
             }
@@ -795,8 +797,9 @@ module.exports = (bot) => {
                 const ticketId = String(tickets.length + 1).padStart(3, "0");
                 tickets.push({ id: ticketId, userId: fromId, username: userName, first_name: ctx.from.first_name || "", message: text, status: "open", replies: [], created_at: new Date().toISOString(), last_activity: new Date().toISOString(), closed_at: null });
                 saveTickets(tickets);
-                await ctx.reply(`🎫 <b>Tiket #${ticketId} Dibuat!</b>\n\n📝 ${escapeHtml(text)}\n⏳ Admin akan segera merespons.\n\n<i>Cek status: <code>${config.prefix}cektiket</code></i>`, { parse_mode: "HTML" });
-                try { await ctx.telegram.sendMessage(config.ownerId, `🔔 <b>TIKET BARU! #${ticketId}</b>\n\n👤 @${escapeHtml(userName)} (<code>${fromId}</code>)\n📝 ${escapeHtml(text)}\n\n<i>Reply pesan ini untuk membalas.</i>`, { parse_mode: "HTML" }); } catch (e) {}
+                const tglBuat = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+                await ctx.reply(`🎫 <b>Tiket Support #${ticketId}</b>\n━━━━━━━━━━━━━━━━━━━━\n\n📝 ${escapeHtml(text)}\n\n━━━━━━━━━━━━━━━━━━━━\n⏰ ${tglBuat} WIB\n⏳ Menunggu balasan admin\n\n↩️ Reply untuk menambah pesan`, { parse_mode: "HTML" });
+                try { await ctx.telegram.sendMessage(config.ownerId, `🔔 <b>Tiket Baru #${ticketId}</b>\n━━━━━━━━━━━━━━━━━━━━\n\n👤 @${escapeHtml(userName)} (<code>${fromId}</code>)\n📝 ${escapeHtml(text)}\n\n━━━━━━━━━━━━━━━━━━━━\n↩️ Reply untuk membalas\n<code>${config.prefix}reply ${ticketId} [pesan]</code>`, { parse_mode: "HTML" }); } catch (e) {}
                 return;
             }
 
@@ -841,7 +844,8 @@ module.exports = (bot) => {
                 tickets[idx].replies.push({ from: "admin", message: replyMsg, timestamp: new Date().toISOString() });
                 tickets[idx].last_activity = new Date().toISOString();
                 saveTickets(tickets);
-                try { await ctx.telegram.sendMessage(tickets[idx].userId, `💬 <b>Balasan Tiket #${tickets[idx].id}</b>\n\n💬 <b>Admin:</b>\n${escapeHtml(replyMsg)}\n\n<i>Reply pesan ini untuk membalas.</i>`, { parse_mode: "HTML" }); } catch (e) {}
+                const jam = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
+                try { await ctx.telegram.sendMessage(tickets[idx].userId, `💬 <b>Tiket #${tickets[idx].id} — Balasan Admin</b>\n━━━━━━━━━━━━━━━━━━━━\n\n${escapeHtml(replyMsg)}\n\n━━━━━━━━━━━━━━━━━━━━\n⏰ ${jam} WIB\n↩️ Reply untuk membalas`, { parse_mode: "HTML" }); } catch (e) {}
                 return ctx.reply(`✅ Balasan terkirim ke tiket <b>#${tid}</b>`, { parse_mode: "HTML" });
             }
 
@@ -854,7 +858,7 @@ module.exports = (bot) => {
                 if (idx === -1) return ctx.reply("❌ Tiket tidak ditemukan.");
                 tickets[idx].status = "closed"; tickets[idx].closed_at = new Date().toISOString();
                 saveTickets(tickets);
-                try { await ctx.telegram.sendMessage(tickets[idx].userId, `🔴 <b>Tiket #${text} Ditutup</b>\n\nJika masih ada masalah, buat tiket baru.`, { parse_mode: "HTML" }); } catch (e) {}
+                try { await ctx.telegram.sendMessage(tickets[idx].userId, `🔴 <b>Tiket #${text} Ditutup</b>\n━━━━━━━━━━━━━━━━━━━━\n\nTiket telah diselesaikan oleh admin.\nJika masih ada masalah, buat tiket baru:\n<code>${config.prefix}support [pesan]</code>`, { parse_mode: "HTML" }); } catch (e) {}
                 return ctx.reply(`✅ Tiket <b>#${text}</b> ditutup.`, { parse_mode: "HTML" });
             }
 
