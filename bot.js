@@ -13,6 +13,7 @@ const reviewDB = path.join(__dirname, "/database/reviews.json");
 const blacklistDB = path.join(__dirname, "/database/blacklist.json");
 const ticketDB = path.join(__dirname, "/database/tickets.json");
 const claimDB = path.join(__dirname, "/database/claims.json");
+const supportChatDB = path.join(__dirname, "/database/support_chats.json");
 const orders = {};
 const pendingReviews = {};
 
@@ -23,6 +24,7 @@ if (!fs.existsSync(reviewDB)) fs.writeFileSync(reviewDB, "[]");
 if (!fs.existsSync(blacklistDB)) fs.writeFileSync(blacklistDB, "[]");
 if (!fs.existsSync(ticketDB)) fs.writeFileSync(ticketDB, "[]");
 if (!fs.existsSync(claimDB)) fs.writeFileSync(claimDB, "[]");
+if (!fs.existsSync(supportChatDB)) fs.writeFileSync(supportChatDB, "[]");
 
 // Load/Save functions
 const loadUsers = () => JSON.parse(fs.readFileSync(userDB));
@@ -37,6 +39,8 @@ const loadTickets = () => JSON.parse(fs.readFileSync(ticketDB));
 const saveTickets = (d) => fs.writeFileSync(ticketDB, JSON.stringify(d, null, 2));
 const loadClaims = () => JSON.parse(fs.readFileSync(claimDB));
 const saveClaims = (d) => fs.writeFileSync(claimDB, JSON.stringify(d, null, 2));
+const loadSupportChats = () => JSON.parse(fs.readFileSync(supportChatDB));
+const saveSupportChats = (d) => fs.writeFileSync(supportChatDB, JSON.stringify(d, null, 2));
 const isBlacklisted = (userId) => {
     const blacklist = loadBlacklist();
     return blacklist.some(b => String(b.id) === String(userId));
@@ -68,6 +72,82 @@ function randomNumber(length = 5) { const min = Math.pow(10, length - 1); return
 function generateRandomFee(min = 100, max = 200) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 function toRupiah(angka) { return angka.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
 function escapeHtml(text) { return String(text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+
+// Build live chat bubble display
+function buildChatBubble(chat) {
+    const MAX_MESSAGES = 15;
+    const messages = chat.messages.slice(-MAX_MESSAGES);
+    let bubble = `◈ 𝐃𝐈𝐆𝐈𝐂𝐎𝐑𝐄 — 𝐋𝐢𝐯𝐞 𝐂𝐡𝐚𝐭\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    messages.forEach(msg => {
+        const time = new Date(msg.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
+        const icon = msg.from === "admin" ? "👨‍💻 Admin" : `👤 ${escapeHtml(chat.username || "User")}`;
+        bubble += `${icon} • ${time}\n`;
+        bubble += `╭───────────────────╮\n`;
+        const lines = escapeHtml(msg.message).split("\n");
+        lines.forEach(line => {
+            bubble += `│ ${line}\n`;
+        });
+        bubble += `╰───────────────────╯\n\n`;
+    });
+
+    bubble += `━━━━━━━━━━━━━━━━━━━━\n`;
+    const lastTime = messages.length > 0 ? new Date(messages[messages.length - 1].timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) : "-";
+    bubble += `💬 ${messages.length} pesan • ⏰ ${lastTime} WIB\n`;
+    bubble += `↩️ Reply untuk membalas`;
+
+    if (chat.messages.length > MAX_MESSAGES) {
+        bubble = bubble.replace("━━━━━━━━━━━━━━━━━━━━\n\n", `━━━━━━━━━━━━━━━━━━━━\n<i>... ${chat.messages.length - MAX_MESSAGES} pesan sebelumnya</i>\n\n`);
+    }
+
+    return bubble;
+}
+
+// Find or create support chat session
+function findActiveChat(userId) {
+    const chats = loadSupportChats();
+    return chats.find(c => String(c.userId) === String(userId) && c.status === "active");
+}
+
+function createChat(userId, username) {
+    const chats = loadSupportChats();
+    // Close existing active chat if any
+    const existing = chats.find(c => String(c.userId) === String(userId) && c.status === "active");
+    if (existing) return existing;
+
+    const chat = {
+        id: String(chats.length + 1).padStart(3, "0"),
+        userId,
+        username,
+        status: "active",
+        messages: [],
+        ownerMsgId: null,
+        userMsgId: null,
+        created_at: new Date().toISOString(),
+        last_activity: new Date().toISOString()
+    };
+    chats.push(chat);
+    saveSupportChats(chats);
+    return chat;
+}
+
+function addChatMessage(chatId, from, message) {
+    const chats = loadSupportChats();
+    const chat = chats.find(c => c.id === chatId);
+    if (!chat) return null;
+    chat.messages.push({ from, message, timestamp: new Date().toISOString() });
+    chat.last_activity = new Date().toISOString();
+    saveSupportChats(chats);
+    return chat;
+}
+
+function updateChatMsgId(chatId, field, msgId) {
+    const chats = loadSupportChats();
+    const chat = chats.find(c => c.id === chatId);
+    if (!chat) return;
+    chat[field] = msgId;
+    saveSupportChats(chats);
+}
 
 global.startTime = Date.now();
 function fmtDur(ms) { const s = Math.floor(ms / 1000) % 60; const m = Math.floor(ms / 6e4) % 60; const h = Math.floor(ms / 36e5) % 24; const d = Math.floor(ms / 864e5); return `${d} hari ${h} jam ${m} menit`; }
@@ -249,6 +329,41 @@ module.exports = (bot) => {
         // Owner reply ticket via reply message
         if (!isCmd && isOwner(ctx) && ctx.message.reply_to_message) {
             const replyText = ctx.message.reply_to_message.text || "";
+
+            // Cek apakah reply ke Live Chat bubble
+            if (replyText.includes("𝐋𝐢𝐯𝐞 𝐂𝐡𝐚𝐭")) {
+                // Find which user this chat belongs to
+                const chats = loadSupportChats();
+                const chat = chats.find(c => c.status === "active" && c.ownerMsgId === ctx.message.reply_to_message.message_id);
+                if (chat) {
+                    const updatedChat = addChatMessage(chat.id, "admin", body);
+                    const bubbleText = buildChatBubble(updatedChat);
+
+                    // Edit owner's message
+                    try {
+                        await ctx.telegram.editMessageText(ctx.chat.id, updatedChat.ownerMsgId, null, bubbleText, { parse_mode: "HTML" });
+                    } catch (e) {
+                        const ownerMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
+                        updateChatMsgId(updatedChat.id, "ownerMsgId", ownerMsg.message_id);
+                    }
+
+                    // Edit user's message
+                    if (updatedChat.userMsgId) {
+                        try {
+                            await ctx.telegram.editMessageText(updatedChat.userId, updatedChat.userMsgId, null, bubbleText, { parse_mode: "HTML" });
+                        } catch (e) {
+                            const userMsg = await ctx.telegram.sendMessage(updatedChat.userId, bubbleText, { parse_mode: "HTML" });
+                            updateChatMsgId(updatedChat.id, "userMsgId", userMsg.message_id);
+                        }
+                    } else {
+                        const userMsg = await ctx.telegram.sendMessage(updatedChat.userId, bubbleText, { parse_mode: "HTML" });
+                        updateChatMsgId(updatedChat.id, "userMsgId", userMsg.message_id);
+                    }
+
+                    return;
+                }
+            }
+
             const match = replyText.match(/Tiket #(\d+)|#(\d{3})/);
             if (match) {
                 const tid = match[1] || match[2];
@@ -268,19 +383,42 @@ module.exports = (bot) => {
         if (!isCmd && !isOwner(ctx) && ctx.message.reply_to_message) {
             const replyText = ctx.message.reply_to_message.text || "";
 
-            // Cek apakah reply ke pesan dari Admin (fitur /support @user)
-            if (replyText.includes("Pesan dari Admin")) {
-                try {
-                    await ctx.telegram.sendMessage(config.ownerId,
-                        `💬 <b>BALASAN USER</b>\n\n` +
-                        `👤 @${escapeHtml(userName)} (<code>${fromId}</code>)\n` +
-                        `📝 ${escapeHtml(body)}\n\n` +
-                        `<i>Balas dengan: <code>${config.prefix}support @${escapeHtml(userName)} [pesan]</code></i>`,
-                        { parse_mode: "HTML" }
-                    );
-                    await ctx.reply(`✅ Balasan terkirim ke admin!`, { parse_mode: "HTML" });
-                } catch (e) {}
-                return;
+            // Cek apakah reply ke pesan Live Chat (fitur /support @user)
+            if (replyText.includes("𝐋𝐢𝐯𝐞 𝐂𝐡𝐚𝐭") || replyText.includes("Pesan dari Admin")) {
+                const chat = findActiveChat(fromId);
+                if (chat) {
+                    // Add user message to chat
+                    const updatedChat = addChatMessage(chat.id, "user", body);
+                    const bubbleText = buildChatBubble(updatedChat);
+
+                    // Edit user's message
+                    if (updatedChat.userMsgId) {
+                        try {
+                            await ctx.telegram.editMessageText(ctx.chat.id, updatedChat.userMsgId, null, bubbleText, { parse_mode: "HTML" });
+                        } catch (e) {
+                            const newMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
+                            updateChatMsgId(updatedChat.id, "userMsgId", newMsg.message_id);
+                        }
+                    } else {
+                        const newMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
+                        updateChatMsgId(updatedChat.id, "userMsgId", newMsg.message_id);
+                    }
+
+                    // Edit owner's message
+                    if (updatedChat.ownerMsgId) {
+                        try {
+                            await ctx.telegram.editMessageText(config.ownerId, updatedChat.ownerMsgId, null, bubbleText, { parse_mode: "HTML" });
+                        } catch (e) {
+                            const ownerMsg = await ctx.telegram.sendMessage(config.ownerId, bubbleText, { parse_mode: "HTML" });
+                            updateChatMsgId(updatedChat.id, "ownerMsgId", ownerMsg.message_id);
+                        }
+                    } else {
+                        const ownerMsg = await ctx.telegram.sendMessage(config.ownerId, bubbleText, { parse_mode: "HTML" });
+                        updateChatMsgId(updatedChat.id, "ownerMsgId", ownerMsg.message_id);
+                    }
+
+                    return;
+                }
             }
 
             const match = replyText.match(/Tiket #(\d+)|#(\d{3})/);
@@ -643,7 +781,7 @@ module.exports = (bot) => {
 
             // ===== SUPPORT/TICKET =====
             case "support": case "ticket": {
-                // Owner mode: /support @user pesan — langsung chat ke user
+                // Owner mode: /support @user pesan — live chat ke user
                 if (isOwner(ctx) && text) {
                     const supportArgs = text.split(" ");
                     const targetInput = supportArgs[0];
@@ -661,19 +799,44 @@ module.exports = (bot) => {
                         if (!targetUser) return ctx.reply(`❌ User <b>${escapeHtml(targetInput)}</b> tidak ditemukan di database.`, { parse_mode: "HTML" });
 
                         try {
-                            await ctx.telegram.sendMessage(targetUser.id,
-                                `💬 <b>Pesan dari Admin</b>\n━━━━━━━━━━━━━━━━━━━━\n\n` +
-                                `${escapeHtml(supportMsg)}\n\n` +
-                                `━━━━━━━━━━━━━━━━━━━━\n` +
-                                `<i>Reply pesan ini untuk membalas admin.</i>`,
-                                { parse_mode: "HTML" }
-                            );
-                            return ctx.reply(
-                                `✅ <b>Pesan terkirim!</b>\n\n` +
-                                `👤 Ke: @${escapeHtml(targetUser.username || targetUser.first_name || "-")} (<code>${targetUser.id}</code>)\n` +
-                                `💬 Pesan: ${escapeHtml(supportMsg)}`,
-                                { parse_mode: "HTML" }
-                            );
+                            // Find or create chat session
+                            let chat = findActiveChat(targetUser.id);
+                            if (!chat) {
+                                chat = createChat(targetUser.id, targetUser.username || targetUser.first_name || "User");
+                            }
+
+                            // Add message to chat
+                            chat = addChatMessage(chat.id, "admin", supportMsg);
+                            const bubbleText = buildChatBubble(chat);
+
+                            // Update/send message to user
+                            if (chat.userMsgId) {
+                                try {
+                                    await ctx.telegram.editMessageText(targetUser.id, chat.userMsgId, null, bubbleText, { parse_mode: "HTML" });
+                                } catch (e) {
+                                    // If edit fails, send new message
+                                    const userMsg = await ctx.telegram.sendMessage(targetUser.id, bubbleText, { parse_mode: "HTML" });
+                                    updateChatMsgId(chat.id, "userMsgId", userMsg.message_id);
+                                }
+                            } else {
+                                const userMsg = await ctx.telegram.sendMessage(targetUser.id, bubbleText, { parse_mode: "HTML" });
+                                updateChatMsgId(chat.id, "userMsgId", userMsg.message_id);
+                            }
+
+                            // Update/send message to owner
+                            if (chat.ownerMsgId) {
+                                try {
+                                    await ctx.telegram.editMessageText(ctx.chat.id, chat.ownerMsgId, null, bubbleText, { parse_mode: "HTML" });
+                                } catch (e) {
+                                    const ownerMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
+                                    updateChatMsgId(chat.id, "ownerMsgId", ownerMsg.message_id);
+                                }
+                            } else {
+                                const ownerMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
+                                updateChatMsgId(chat.id, "ownerMsgId", ownerMsg.message_id);
+                            }
+
+                            return;
                         } catch (e) {
                             return ctx.reply(`❌ Gagal mengirim pesan ke user.\n\n<b>Error:</b> ${escapeHtml(e.message || "User mungkin sudah block bot")}`, { parse_mode: "HTML" });
                         }
