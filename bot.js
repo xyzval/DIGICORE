@@ -130,6 +130,7 @@ const menuTextOwn = () => `<blockquote>( ⸙‌ ) 𝐃𝐈𝐆𝐈𝐂𝐎𝐑�
 ▢ ${config.prefix}ban
 ▢ ${config.prefix}unban
 ▢ ${config.prefix}banlist
+▢ ${config.prefix}support @user [pesan]
 ▢ ${config.prefix}tickets
 ▢ ${config.prefix}reply
 ▢ ${config.prefix}closeticket
@@ -266,6 +267,22 @@ module.exports = (bot) => {
         // User reply ticket via reply message
         if (!isCmd && !isOwner(ctx) && ctx.message.reply_to_message) {
             const replyText = ctx.message.reply_to_message.text || "";
+
+            // Cek apakah reply ke pesan dari Admin (fitur /support @user)
+            if (replyText.includes("Pesan dari Admin")) {
+                try {
+                    await ctx.telegram.sendMessage(config.ownerId,
+                        `💬 <b>BALASAN USER</b>\n\n` +
+                        `👤 @${escapeHtml(userName)} (<code>${fromId}</code>)\n` +
+                        `📝 ${escapeHtml(body)}\n\n` +
+                        `<i>Balas dengan: <code>${config.prefix}support @${escapeHtml(userName)} [pesan]</code></i>`,
+                        { parse_mode: "HTML" }
+                    );
+                    await ctx.reply(`✅ Balasan terkirim ke admin!`, { parse_mode: "HTML" });
+                } catch (e) {}
+                return;
+            }
+
             const match = replyText.match(/Tiket #(\d+)|#(\d{3})/);
             if (match) {
                 const tid = match[1] || match[2];
@@ -626,7 +643,45 @@ module.exports = (bot) => {
 
             // ===== SUPPORT/TICKET =====
             case "support": case "ticket": {
-                if (!text) return ctx.reply(`🎫 <b>Buat Tiket Support:</b>\n<code>${config.prefix}support [pesan keluhan]</code>\n\nContoh: <code>${config.prefix}support VPS saya tidak bisa diakses</code>`, { parse_mode: "HTML" });
+                // Owner mode: /support @user pesan — langsung chat ke user
+                if (isOwner(ctx) && text) {
+                    const supportArgs = text.split(" ");
+                    const targetInput = supportArgs[0];
+                    const supportMsg = supportArgs.slice(1).join(" ");
+
+                    // Cek apakah format owner: /support @user atau /support userId
+                    if ((targetInput.startsWith("@") || /^\d+$/.test(targetInput)) && supportMsg) {
+                        const users = loadUsers();
+                        const targetSearch = targetInput.replace("@", "").trim();
+                        const targetUser = users.find(u =>
+                            String(u.id) === targetSearch ||
+                            (u.username && u.username.toLowerCase() === targetSearch.toLowerCase())
+                        );
+
+                        if (!targetUser) return ctx.reply(`❌ User <b>${escapeHtml(targetInput)}</b> tidak ditemukan di database.`, { parse_mode: "HTML" });
+
+                        try {
+                            await ctx.telegram.sendMessage(targetUser.id,
+                                `💬 <b>Pesan dari Admin</b>\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+                                `${escapeHtml(supportMsg)}\n\n` +
+                                `━━━━━━━━━━━━━━━━━━━━\n` +
+                                `<i>Reply pesan ini untuk membalas admin.</i>`,
+                                { parse_mode: "HTML" }
+                            );
+                            return ctx.reply(
+                                `✅ <b>Pesan terkirim!</b>\n\n` +
+                                `👤 Ke: @${escapeHtml(targetUser.username || targetUser.first_name || "-")} (<code>${targetUser.id}</code>)\n` +
+                                `💬 Pesan: ${escapeHtml(supportMsg)}`,
+                                { parse_mode: "HTML" }
+                            );
+                        } catch (e) {
+                            return ctx.reply(`❌ Gagal mengirim pesan ke user.\n\n<b>Error:</b> ${escapeHtml(e.message || "User mungkin sudah block bot")}`, { parse_mode: "HTML" });
+                        }
+                    }
+                }
+
+                // User mode: /support [pesan] — buat tiket
+                if (!text) return ctx.reply(`🎫 <b>Buat Tiket Support:</b>\n<code>${config.prefix}support [pesan keluhan]</code>\n\nContoh: <code>${config.prefix}support VPS saya tidak bisa diakses</code>${isOwner(ctx) ? `\n\n━━━━━━━━━━━━━━━━━━━━\n🔑 <b>Owner Mode:</b>\n<code>${config.prefix}support @username [pesan]</code>\n<code>${config.prefix}support [userId] [pesan]</code>\n\nContoh: <code>${config.prefix}support @user123 halo, ada yang bisa dibantu?</code>` : ""}`, { parse_mode: "HTML" });
                 const tickets = loadTickets();
                 const ticketId = String(tickets.length + 1).padStart(3, "0");
                 tickets.push({ id: ticketId, userId: fromId, username: userName, first_name: ctx.from.first_name || "", message: text, status: "open", replies: [], created_at: new Date().toISOString(), last_activity: new Date().toISOString(), closed_at: null });
