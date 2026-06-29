@@ -9,9 +9,9 @@ const ticketDB = path.join(__dirname, "database/tickets.json");
 const loadTickets = () => JSON.parse(fs.readFileSync(ticketDB));
 const saveTickets = (d) => fs.writeFileSync(ticketDB, JSON.stringify(d, null, 2));
 
-// Auto close tiket tidak aktif 48 jam
+// Auto close tiket tidak aktif 24 jam
 const AUTO_CLOSE_INTERVAL = 60 * 60 * 1000;
-const INACTIVE_LIMIT = 48 * 60 * 60 * 1000;
+const INACTIVE_LIMIT = 24 * 60 * 60 * 1000;
 
 async function autoCloseTickets(bot) {
   try {
@@ -25,11 +25,11 @@ async function autoCloseTickets(bot) {
       if (now - lastTime >= INACTIVE_LIMIT) {
         ticket.status = "closed";
         ticket.closed_at = new Date().toISOString();
-        ticket.closed_reason = "auto_close_48h";
+        ticket.closed_reason = "auto_close_24h";
         changed = true;
         try {
           await bot.telegram.sendMessage(ticket.userId,
-            `🔴 <b>Tiket #${ticket.id} Ditutup Otomatis</b>\n\nTidak ada aktivitas selama 48 jam.\nBuat tiket baru jika masih ada masalah:\n<code>${config.prefix}support [pesan]</code>`,
+            `🔴 <b>Tiket #${ticket.id} Ditutup Otomatis</b>\n━━━━━━━━━━━━━━━━━━━━\n\nTidak ada aktivitas selama 24 jam.\nBuat tiket baru jika masih ada masalah:\n<code>${config.prefix}support [pesan]</code>`,
             { parse_mode: "HTML" });
         } catch (e) {}
       }
