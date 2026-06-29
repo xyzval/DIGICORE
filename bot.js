@@ -412,7 +412,31 @@ module.exports = (bot) => {
 
         // Owner reply ticket via reply message
         if (!isCmd && isOwner(ctx) && ctx.message.reply_to_message) {
-            const replyText = ctx.message.reply_to_message.text || "";
+            const replyText = ctx.message.reply_to_message.text || ctx.message.reply_to_message.caption || "";
+
+            // Owner reply ke notif DM dari user
+            if (replyText.includes("Balasan DM dari User") || replyText.includes("Pesan dari Admin")) {
+                // Cari userId dari pesan
+                const userMatch = replyText.match(/(\d{5,})/);
+                if (userMatch) {
+                    const targetId = parseInt(userMatch[0]);
+                    const users = loadUsers();
+                    const targetUser = users.find(u => u.id === targetId);
+                    if (targetUser) {
+                        const jam = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
+                        try {
+                            await ctx.telegram.sendMessage(targetUser.id,
+                                `📩 <b>Pesan dari Admin</b>\n━━━━━━━━━━━━━━━━━━━━\n\n${escapeHtml(body)}\n\n━━━━━━━━━━━━━━━━━━━━\n⏰ ${jam} WIB\n↩️ Reply untuk membalas`,
+                                { parse_mode: "HTML" }
+                            );
+                            return ctx.reply(`✅ <b>Pesan terkirim!</b>\n\n👤 Ke: @${escapeHtml(targetUser.username || targetUser.first_name || "-")} (<code>${targetUser.id}</code>)\n💬 ${escapeHtml(body)}`, { parse_mode: "HTML" });
+                        } catch (e) {
+                            return ctx.reply(`❌ Gagal mengirim: ${escapeHtml(e.message || "User block bot")}`, { parse_mode: "HTML" });
+                        }
+                    }
+                }
+            }
+
             const match = replyText.match(/Tiket.*?#(\d+)|#(\d{3})/);
             if (match) {
                 const tid = match[1] || match[2];
