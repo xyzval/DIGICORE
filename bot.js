@@ -994,39 +994,62 @@ module.exports = (bot) => {
             // ===== ADD STOCK VPS =====
             case "addstockvps": {
                 if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
-                if (!text.includes("|")) return ctx.reply(`Format:\n<code>${config.prefix}addstockvps kategori|keterangan|IP|PORT|USER|PASSWORD|harga</code>\n\nContoh 1 harga (harga premium, dasar otomatis -Rp${toRupiah(config.garansiMarkup || 10000)}):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM 50GiB NMVe SSD|SGD Ubuntu24.04|1.2.3.4|22022|root|abc123|35000</code>\n\nContoh 2 harga (manual):\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM 50GiB NMVe SSD|SGD Ubuntu24.04|1.2.3.4|22022|root|abc123|35000|25000</code>`, { parse_mode: "HTML" });
-                const parts = text.split("|").map(v => v.trim());
-                if (parts.length < 7) return ctx.reply("Format tidak valid! Minimal: kategori|keterangan|IP|PORT|USER|PASSWORD|harga");
-                const category = parts[0];
-                const description = parts[1];
-                const ip = parts[2];
-                const port = parts[3];
-                const user = parts[4];
-                const password = parts[5];
-                const accountData = `IP: ${ip}\nPORT: ${port}\nUSER: ${user}\nPASSWORD: ${password}`;
+                if (!text.includes("|")) return ctx.reply(`Format:\n<code>${config.prefix}addstockvps kategori|keterangan|IP|PORT|USER|PASSWORD|harga</code>\n\n<b>Multi add (banyak sekaligus):</b>\n<code>${config.prefix}addstockvps\nkategori|ket|IP|PORT|USER|PASS|harga\nkategori|ket|IP|PORT|USER|PASS|harga\nkategori|ket|IP|PORT|USER|PASS|harga</code>\n\nContoh:\n<code>${config.prefix}addstockvps 2vCPU 8GB RAM 50GiB NMVe SSD|SGD Ubuntu24.04|1.2.3.4|22022|root|abc123|35000</code>`, { parse_mode: "HTML" });
 
-                let priceGaransi, priceNoGaransi;
+                // Support multi-line (banyak akun sekaligus)
+                const lines = text.split("\n").map(l => l.trim()).filter(l => l.includes("|"));
+                const vpsData = loadVps();
+                let successCount = 0;
+                let failCount = 0;
+                let results = [];
 
-                if (parts.length >= 8 && !isNaN(parseInt(parts[6])) && !isNaN(parseInt(parts[7]))) {
-                    // Manual 2 harga
-                    priceGaransi = parseInt(parts[6]);
-                    priceNoGaransi = parseInt(parts[7]);
-                } else {
-                    // 1 harga = harga premium, dasar otomatis dikurangi markup
-                    priceGaransi = parseInt(parts[6]);
-                    priceNoGaransi = priceGaransi - (config.garansiMarkup || 10000);
-                    if (priceNoGaransi < 0) priceNoGaransi = priceGaransi;
+                for (const line of lines) {
+                    const parts = line.split("|").map(v => v.trim());
+                    if (parts.length < 7) { failCount++; results.push(`❌ ${parts[0] || "?"} — format tidak valid`); continue; }
+                    const category = parts[0];
+                    const description = parts[1];
+                    const ip = parts[2];
+                    const port = parts[3];
+                    const user = parts[4];
+                    const password = parts[5];
+                    const accountData = `IP: ${ip}\nPORT: ${port}\nUSER: ${user}\nPASSWORD: ${password}`;
+
+                    let priceGaransi, priceNoGaransi;
+                    if (parts.length >= 8 && !isNaN(parseInt(parts[6])) && !isNaN(parseInt(parts[7]))) {
+                        priceGaransi = parseInt(parts[6]);
+                        priceNoGaransi = parseInt(parts[7]);
+                    } else {
+                        priceGaransi = parseInt(parts[6]);
+                        priceNoGaransi = priceGaransi - (config.garansiMarkup || 10000);
+                        if (priceNoGaransi < 0) priceNoGaransi = priceGaransi;
+                    }
+
+                    if (!category || !description || !ip || !port || !user || !password || isNaN(priceNoGaransi)) { failCount++; results.push(`❌ ${ip || "?"} — data tidak valid`); continue; }
+
+                    if (!vpsData[category]) vpsData[category] = [];
+                    let existing = vpsData[category].find(i => i.description.toLowerCase() === description.toLowerCase() && i.priceNoGaransi === priceNoGaransi);
+                    if (existing) { existing.accounts.push(accountData); existing.stock = existing.accounts.length; }
+                    else { vpsData[category].push({ description, price: priceGaransi, priceGaransi, priceNoGaransi, stock: 1, accounts: [accountData], added_date: new Date().toISOString() }); }
+                    successCount++;
+                    results.push(`✅ ${escapeHtml(ip)} — ${escapeHtml(category)}`);
                 }
 
-                if (!category || !description || !ip || !port || !user || !password || isNaN(priceNoGaransi)) return ctx.reply("Data tidak valid!");
-                const vpsData = loadVps();
-                if (!vpsData[category]) vpsData[category] = [];
-                let existing = vpsData[category].find(i => i.description.toLowerCase() === description.toLowerCase() && i.priceNoGaransi === priceNoGaransi);
-                if (existing) { existing.accounts.push(accountData); existing.stock = existing.accounts.length; }
-                else { vpsData[category].push({ description, price: priceGaransi, priceGaransi, priceNoGaransi, stock: 1, accounts: [accountData], added_date: new Date().toISOString() }); }
                 saveVps(vpsData);
-                const totalInCat = vpsData[category].reduce((s, i) => s + i.accounts.length, 0);
-                return ctx.reply(`✅ <b>Stock VPS Berhasil ditambahkan!</b>\n\n📁 Kategori: ${escapeHtml(category)}\n📝 Keterangan: ${escapeHtml(description)}\n🌐 IP: ${escapeHtml(ip)}\n🔌 Port: ${escapeHtml(port)}\n👤 User: ${escapeHtml(user)}\n🔑 Pass: ${escapeHtml(password)}\n🛡️ Harga Garansi: Rp${toRupiah(priceGaransi)}\n⚡ Harga Dasar: Rp${toRupiah(priceNoGaransi)}\n📦 Total stok kategori: ${totalInCat}`, { parse_mode: "HTML" });
+
+                if (lines.length === 1 && successCount === 1) {
+                    // Single add — tampilan detail
+                    const parts = lines[0].split("|").map(v => v.trim());
+                    const priceGaransi = parseInt(parts[6]);
+                    const priceNoGaransi = parts.length >= 8 ? parseInt(parts[7]) : priceGaransi - (config.garansiMarkup || 10000);
+                    const totalInCat = vpsData[parts[0]].reduce((s, i) => s + i.accounts.length, 0);
+                    return ctx.reply(`✅ <b>Stock VPS Berhasil ditambahkan!</b>\n\n📁 Kategori: ${escapeHtml(parts[0])}\n📝 Keterangan: ${escapeHtml(parts[1])}\n🌐 IP: ${escapeHtml(parts[2])}\n🔌 Port: ${escapeHtml(parts[3])}\n👤 User: ${escapeHtml(parts[4])}\n🔑 Pass: ${escapeHtml(parts[5])}\n🛡️ Harga Garansi: Rp${toRupiah(priceGaransi)}\n⚡ Harga Dasar: Rp${toRupiah(priceNoGaransi < 0 ? priceGaransi : priceNoGaransi)}\n📦 Total stok kategori: ${totalInCat}`, { parse_mode: "HTML" });
+                }
+
+                // Multi add — tampilan ringkasan
+                let reply = `📦 <b>Multi Add Stock Selesai!</b>\n━━━━━━━━━━━━━━━━━━━━\n\n✅ Berhasil: ${successCount}\n❌ Gagal: ${failCount}\n\n`;
+                results.slice(0, 20).forEach(r => { reply += `${r}\n`; });
+                if (results.length > 20) reply += `\n<i>...dan ${results.length - 20} lainnya</i>`;
+                return ctx.reply(reply, { parse_mode: "HTML" });
             }
 
             // ===== DEL STOCK VPS =====
