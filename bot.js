@@ -284,8 +284,6 @@ const menuTextOwn = () => `<blockquote>( ⸙‌ ) 𝐃𝐈𝐆𝐈𝐂𝐎𝐑�
 ▢ ${config.prefix}ban
 ▢ ${config.prefix}unban
 ▢ ${config.prefix}banlist
-▢ ${config.prefix}support @user [pesan]
-▢ ${config.prefix}closechat @user
 ▢ ${config.prefix}tickets
 ▢ ${config.prefix}reply
 ▢ ${config.prefix}closeticket
@@ -378,10 +376,6 @@ async function checkLowStock(bot) {
 
 module.exports = (bot) => {
 
-    // Start auto close chats interval (every 5 minutes)
-    setInterval(() => autoCloseChats(bot), 5 * 60 * 1000);
-    setTimeout(() => autoCloseChats(bot), 30000); // First check after 30s
-
     // ===== TEXT HANDLER =====
     bot.on("text", async (ctx) => {
         const msg = ctx.message;
@@ -422,68 +416,6 @@ module.exports = (bot) => {
         // Owner reply ticket via reply message
         if (!isCmd && isOwner(ctx) && ctx.message.reply_to_message) {
             const replyText = ctx.message.reply_to_message.text || "";
-
-            // Cek apakah reply ke Live Chat bubble ATAU notif
-            if (replyText.includes("𝐋𝐢𝐯𝐞 𝐂𝐡𝐚𝐭") || replyText.includes("➜") || replyText.includes("Reply pesan ini untuk membalas")) {
-                // Find which user this chat belongs to
-                const chats = loadSupportChats();
-                const replyMsgId = ctx.message.reply_to_message.message_id;
-                const chat = chats.find(c => c.status === "active" && (c.ownerMsgId === replyMsgId || c.ownerNotifId === replyMsgId));
-                if (chat) {
-                    // Clear owner's unread & delete owner notif
-                    clearUnread(chat.id);
-                    if (chat.ownerNotifId) {
-                        try { await ctx.telegram.deleteMessage(ctx.chat.id, chat.ownerNotifId); } catch (e) {}
-                        updateChatMsgId(chat.id, "ownerNotifId", null);
-                    }
-
-                    const updatedChat = addChatMessage(chat.id, "admin", body);
-                    const bubbleText = buildChatBubble(updatedChat);
-
-                    // Edit owner's bubble
-                    if (updatedChat.ownerMsgId) {
-                        try {
-                            await ctx.telegram.editMessageText(ctx.chat.id, updatedChat.ownerMsgId, null, bubbleText, { parse_mode: "HTML" });
-                        } catch (e) {
-                            const ownerMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
-                            updateChatMsgId(updatedChat.id, "ownerMsgId", ownerMsg.message_id);
-                        }
-                    } else {
-                        const ownerMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
-                        updateChatMsgId(updatedChat.id, "ownerMsgId", ownerMsg.message_id);
-                    }
-
-                    // Edit user's bubble
-                    if (updatedChat.userMsgId) {
-                        try {
-                            await ctx.telegram.editMessageText(updatedChat.userId, updatedChat.userMsgId, null, bubbleText, { parse_mode: "HTML" });
-                        } catch (e) {
-                            const userMsg = await ctx.telegram.sendMessage(updatedChat.userId, bubbleText, { parse_mode: "HTML" });
-                            updateChatMsgId(updatedChat.id, "userMsgId", userMsg.message_id);
-                        }
-                    } else {
-                        const userMsg = await ctx.telegram.sendMessage(updatedChat.userId, bubbleText, { parse_mode: "HTML" });
-                        updateChatMsgId(updatedChat.id, "userMsgId", userMsg.message_id);
-                    }
-
-                    // Send/edit notif to user
-                    const notifText = buildNotifText(updatedChat, "admin", body);
-                    if (updatedChat.userNotifId) {
-                        try {
-                            await ctx.telegram.editMessageText(updatedChat.userId, updatedChat.userNotifId, null, notifText, { parse_mode: "HTML" });
-                        } catch (e) {
-                            const notifMsg = await ctx.telegram.sendMessage(updatedChat.userId, notifText, { parse_mode: "HTML" });
-                            updateChatMsgId(updatedChat.id, "userNotifId", notifMsg.message_id);
-                        }
-                    } else {
-                        const notifMsg = await ctx.telegram.sendMessage(updatedChat.userId, notifText, { parse_mode: "HTML" });
-                        updateChatMsgId(updatedChat.id, "userNotifId", notifMsg.message_id);
-                    }
-
-                    return;
-                }
-            }
-
             const match = replyText.match(/Tiket #(\d+)|#(\d{3})/);
             if (match) {
                 const tid = match[1] || match[2];
@@ -502,66 +434,6 @@ module.exports = (bot) => {
         // User reply ticket via reply message
         if (!isCmd && !isOwner(ctx) && ctx.message.reply_to_message) {
             const replyText = ctx.message.reply_to_message.text || "";
-
-            // Cek apakah reply ke Live Chat bubble ATAU notif
-            if (replyText.includes("𝐋𝐢𝐯𝐞 𝐂𝐡𝐚𝐭") || replyText.includes("➜") || replyText.includes("Reply pesan ini untuk membalas")) {
-                const chat = findActiveChat(fromId);
-                if (chat) {
-                    // Clear user's unread & delete user notif
-                    clearUnread(chat.id);
-                    if (chat.userNotifId) {
-                        try { await ctx.telegram.deleteMessage(ctx.chat.id, chat.userNotifId); } catch (e) {}
-                        updateChatMsgId(chat.id, "userNotifId", null);
-                    }
-
-                    // Add user message to chat
-                    const updatedChat = addChatMessage(chat.id, "user", body);
-                    const bubbleText = buildChatBubble(updatedChat);
-
-                    // Edit user's bubble
-                    if (updatedChat.userMsgId) {
-                        try {
-                            await ctx.telegram.editMessageText(ctx.chat.id, updatedChat.userMsgId, null, bubbleText, { parse_mode: "HTML" });
-                        } catch (e) {
-                            const newMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
-                            updateChatMsgId(updatedChat.id, "userMsgId", newMsg.message_id);
-                        }
-                    } else {
-                        const newMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
-                        updateChatMsgId(updatedChat.id, "userMsgId", newMsg.message_id);
-                    }
-
-                    // Edit owner's bubble
-                    if (updatedChat.ownerMsgId) {
-                        try {
-                            await ctx.telegram.editMessageText(config.ownerId, updatedChat.ownerMsgId, null, bubbleText, { parse_mode: "HTML" });
-                        } catch (e) {
-                            const ownerMsg = await ctx.telegram.sendMessage(config.ownerId, bubbleText, { parse_mode: "HTML" });
-                            updateChatMsgId(updatedChat.id, "ownerMsgId", ownerMsg.message_id);
-                        }
-                    } else {
-                        const ownerMsg = await ctx.telegram.sendMessage(config.ownerId, bubbleText, { parse_mode: "HTML" });
-                        updateChatMsgId(updatedChat.id, "ownerMsgId", ownerMsg.message_id);
-                    }
-
-                    // Send/edit notif to owner
-                    const notifText = buildNotifText(updatedChat, "user", body);
-                    if (updatedChat.ownerNotifId) {
-                        try {
-                            await ctx.telegram.editMessageText(config.ownerId, updatedChat.ownerNotifId, null, notifText, { parse_mode: "HTML" });
-                        } catch (e) {
-                            const notifMsg = await ctx.telegram.sendMessage(config.ownerId, notifText, { parse_mode: "HTML" });
-                            updateChatMsgId(updatedChat.id, "ownerNotifId", notifMsg.message_id);
-                        }
-                    } else {
-                        const notifMsg = await ctx.telegram.sendMessage(config.ownerId, notifText, { parse_mode: "HTML" });
-                        updateChatMsgId(updatedChat.id, "ownerNotifId", notifMsg.message_id);
-                    }
-
-                    return;
-                }
-            }
-
             const match = replyText.match(/Tiket #(\d+)|#(\d{3})/);
             if (match) {
                 const tid = match[1] || match[2];
@@ -922,185 +794,14 @@ module.exports = (bot) => {
 
             // ===== SUPPORT/TICKET =====
             case "support": case "ticket": {
-                // Owner mode: /support @user pesan — live chat ke user
-                if (isOwner(ctx) && text) {
-                    const supportArgs = text.split(" ");
-                    const targetInput = supportArgs[0];
-                    const supportMsg = supportArgs.slice(1).join(" ");
-
-                    // Cek apakah format owner: /support @user atau /support userId
-                    if ((targetInput.startsWith("@") || /^\d+$/.test(targetInput)) && supportMsg) {
-                        const users = loadUsers();
-                        const targetSearch = targetInput.replace("@", "").trim();
-                        const targetUser = users.find(u =>
-                            String(u.id) === targetSearch ||
-                            (u.username && u.username.toLowerCase() === targetSearch.toLowerCase())
-                        );
-
-                        if (!targetUser) return ctx.reply(`❌ User <b>${escapeHtml(targetInput)}</b> tidak ditemukan di database.`, { parse_mode: "HTML" });
-
-                        try {
-                            // Find or create chat session
-                            let chat = findActiveChat(targetUser.id);
-                            if (!chat) {
-                                chat = createChat(targetUser.id, targetUser.username || targetUser.first_name || "User");
-                            }
-
-                            // Clear owner's unread & delete owner notif
-                            clearUnread(chat.id);
-                            if (chat.ownerNotifId) {
-                                try { await ctx.telegram.deleteMessage(ctx.chat.id, chat.ownerNotifId); } catch (e) {}
-                                updateChatMsgId(chat.id, "ownerNotifId", null);
-                            }
-
-                            // Add message to chat
-                            chat = addChatMessage(chat.id, "admin", supportMsg);
-                            const bubbleText = buildChatBubble(chat);
-
-                            // Update/send bubble to user
-                            if (chat.userMsgId) {
-                                try {
-                                    await ctx.telegram.editMessageText(targetUser.id, chat.userMsgId, null, bubbleText, { parse_mode: "HTML" });
-                                } catch (e) {
-                                    const userMsg = await ctx.telegram.sendMessage(targetUser.id, bubbleText, { parse_mode: "HTML" });
-                                    updateChatMsgId(chat.id, "userMsgId", userMsg.message_id);
-                                }
-                            } else {
-                                const userMsg = await ctx.telegram.sendMessage(targetUser.id, bubbleText, { parse_mode: "HTML" });
-                                updateChatMsgId(chat.id, "userMsgId", userMsg.message_id);
-                            }
-
-                            // Update/send bubble to owner
-                            if (chat.ownerMsgId) {
-                                try {
-                                    await ctx.telegram.editMessageText(ctx.chat.id, chat.ownerMsgId, null, bubbleText, { parse_mode: "HTML" });
-                                } catch (e) {
-                                    const ownerMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
-                                    updateChatMsgId(chat.id, "ownerMsgId", ownerMsg.message_id);
-                                }
-                            } else {
-                                const ownerMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
-                                updateChatMsgId(chat.id, "ownerMsgId", ownerMsg.message_id);
-                            }
-
-                            // Send/edit notif to user
-                            const notifText = buildNotifText(chat, "admin", supportMsg);
-                            if (chat.userNotifId) {
-                                try {
-                                    await ctx.telegram.editMessageText(targetUser.id, chat.userNotifId, null, notifText, { parse_mode: "HTML" });
-                                } catch (e) {
-                                    const notifMsg = await ctx.telegram.sendMessage(targetUser.id, notifText, { parse_mode: "HTML" });
-                                    updateChatMsgId(chat.id, "userNotifId", notifMsg.message_id);
-                                }
-                            } else {
-                                const notifMsg = await ctx.telegram.sendMessage(targetUser.id, notifText, { parse_mode: "HTML" });
-                                updateChatMsgId(chat.id, "userNotifId", notifMsg.message_id);
-                            }
-
-                            return;
-                        } catch (e) {
-                            return ctx.reply(`❌ Gagal mengirim pesan ke user.\n\n<b>Error:</b> ${escapeHtml(e.message || "User mungkin sudah block bot")}`, { parse_mode: "HTML" });
-                        }
-                    }
-                }
-
-                // User mode: /support [pesan] — mulai live chat langsung
-                if (!text) return ctx.reply(`💬 <b>Live Chat Support:</b>\n<code>${config.prefix}support [pesan]</code>\n\nContoh: <code>${config.prefix}support VPS saya tidak bisa diakses</code>${isOwner(ctx) ? `\n\n━━━━━━━━━━━━━━━━━━━━\n🔑 <b>Owner Mode:</b>\n<code>${config.prefix}support @username [pesan]</code>\n<code>${config.prefix}support [userId] [pesan]</code>\n\nContoh: <code>${config.prefix}support @user123 halo, ada yang bisa dibantu?</code>` : ""}`, { parse_mode: "HTML" });
-
-                // User memulai / melanjutkan live chat
-                if (!isOwner(ctx)) {
-                    let chat = findActiveChat(fromId);
-                    if (!chat) {
-                        chat = createChat(fromId, userName);
-                    }
-
-                    // Clear user's unread & delete user notif
-                    clearUnread(chat.id);
-                    if (chat.userNotifId) {
-                        try { await ctx.telegram.deleteMessage(ctx.chat.id, chat.userNotifId); } catch (e) {}
-                        updateChatMsgId(chat.id, "userNotifId", null);
-                    }
-
-                    // Add message
-                    chat = addChatMessage(chat.id, "user", text);
-                    const bubbleText = buildChatBubble(chat);
-
-                    // Update/send bubble to user
-                    if (chat.userMsgId) {
-                        try {
-                            await ctx.telegram.editMessageText(ctx.chat.id, chat.userMsgId, null, bubbleText, { parse_mode: "HTML" });
-                        } catch (e) {
-                            const userMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
-                            updateChatMsgId(chat.id, "userMsgId", userMsg.message_id);
-                        }
-                    } else {
-                        const userMsg = await ctx.reply(bubbleText, { parse_mode: "HTML" });
-                        updateChatMsgId(chat.id, "userMsgId", userMsg.message_id);
-                    }
-
-                    // Update/send bubble to owner
-                    if (chat.ownerMsgId) {
-                        try {
-                            await ctx.telegram.editMessageText(config.ownerId, chat.ownerMsgId, null, bubbleText, { parse_mode: "HTML" });
-                        } catch (e) {
-                            const ownerMsg = await ctx.telegram.sendMessage(config.ownerId, bubbleText, { parse_mode: "HTML" });
-                            updateChatMsgId(chat.id, "ownerMsgId", ownerMsg.message_id);
-                        }
-                    } else {
-                        const ownerMsg = await ctx.telegram.sendMessage(config.ownerId, bubbleText, { parse_mode: "HTML" });
-                        updateChatMsgId(chat.id, "ownerMsgId", ownerMsg.message_id);
-                    }
-
-                    // Send/edit notif to owner
-                    const notifText = buildNotifText(chat, "user", text);
-                    if (chat.ownerNotifId) {
-                        try {
-                            await ctx.telegram.editMessageText(config.ownerId, chat.ownerNotifId, null, notifText, { parse_mode: "HTML" });
-                        } catch (e) {
-                            const notifMsg = await ctx.telegram.sendMessage(config.ownerId, notifText, { parse_mode: "HTML" });
-                            updateChatMsgId(chat.id, "ownerNotifId", notifMsg.message_id);
-                        }
-                    } else {
-                        const notifMsg = await ctx.telegram.sendMessage(config.ownerId, notifText, { parse_mode: "HTML" });
-                        updateChatMsgId(chat.id, "ownerNotifId", notifMsg.message_id);
-                    }
-
-                    return;
-                }
-
+                if (!text) return ctx.reply(`🎫 <b>Buat Tiket Support:</b>\n<code>${config.prefix}support [pesan keluhan]</code>\n\nContoh: <code>${config.prefix}support VPS saya tidak bisa diakses</code>`, { parse_mode: "HTML" });
+                const tickets = loadTickets();
+                const ticketId = String(tickets.length + 1).padStart(3, "0");
+                tickets.push({ id: ticketId, userId: fromId, username: userName, first_name: ctx.from.first_name || "", message: text, status: "open", replies: [], created_at: new Date().toISOString(), last_activity: new Date().toISOString(), closed_at: null });
+                saveTickets(tickets);
+                await ctx.reply(`🎫 <b>Tiket #${ticketId} Dibuat!</b>\n\n📝 ${escapeHtml(text)}\n⏳ Admin akan segera merespons.\n\n<i>Cek status: <code>${config.prefix}cektiket</code></i>`, { parse_mode: "HTML" });
+                try { await ctx.telegram.sendMessage(config.ownerId, `🔔 <b>TIKET BARU! #${ticketId}</b>\n\n👤 @${escapeHtml(userName)} (<code>${fromId}</code>)\n📝 ${escapeHtml(text)}\n\n<i>Reply pesan ini untuk membalas.</i>`, { parse_mode: "HTML" }); } catch (e) {}
                 return;
-            }
-
-            // ===== CLOSE CHAT (OWNER) =====
-            case "closechat": case "endchat": {
-                if (!isOwner(ctx)) return ctx.reply("❌ Owner Only!");
-                if (!text) return ctx.reply(`Format: <code>${config.prefix}closechat @username</code>\nAtau: <code>${config.prefix}closechat [userId]</code>`, { parse_mode: "HTML" });
-
-                const targetSearch = text.replace("@", "").trim();
-                const users = loadUsers();
-                const targetUser = users.find(u =>
-                    String(u.id) === targetSearch ||
-                    (u.username && u.username.toLowerCase() === targetSearch.toLowerCase())
-                );
-
-                if (!targetUser) return ctx.reply(`❌ User tidak ditemukan.`, { parse_mode: "HTML" });
-
-                const chat = findActiveChat(targetUser.id);
-                if (!chat) return ctx.reply(`❌ Tidak ada live chat aktif dengan user ini.`, { parse_mode: "HTML" });
-
-                // Close chat
-                closeChat(chat.id);
-
-                // Delete notifs
-                if (chat.userNotifId) { try { await ctx.telegram.deleteMessage(chat.userId, chat.userNotifId); } catch (e) {} }
-                if (chat.ownerNotifId) { try { await ctx.telegram.deleteMessage(config.ownerId, chat.ownerNotifId); } catch (e) {} }
-
-                const closeMsg = `🔴 <b>Live Chat ditutup oleh Admin</b>\n📅 ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB\n💬 Total: ${chat.messages.length} pesan\n\nButuh bantuan lagi? Ketik:\n<code>${config.prefix}support [pesan]</code>`;
-
-                // Notify user
-                try { await ctx.telegram.sendMessage(chat.userId, closeMsg, { parse_mode: "HTML" }); } catch (e) {}
-
-                return ctx.reply(`✅ Live chat dengan @${escapeHtml(targetUser.username || targetUser.first_name || "-")} ditutup.\n💬 Total ${chat.messages.length} pesan.`, { parse_mode: "HTML" });
             }
 
             // ===== CEK TIKET =====
